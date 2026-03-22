@@ -1,0 +1,100 @@
+{
+  "light_mode": {
+    "theme_name": "New (Light Mode)",
+    "description": "Refined to make match with dark mode",
+    "text": {
+      "text_87_percent": "rgba(0, 0, 0, 0.87)",
+      "text_60_percent": "rgba(0, 0, 0, 0.60)",
+      "text_38_percent": "rgba(0, 0, 0, 0.38)"
+    },
+    "surface": {
+      "background": "#F0F2F5",
+      "panel": "#FAFAFA",
+      "border": "#E8E8E8"
+    },
+    "primary": {
+      "primary": "#2673DD",
+      "primary_20_percent": "rgba(38, 115, 221, 0.2)",
+      "primary_5_percent": "rgba(38, 115, 221, 0.05)"
+    },
+    "status": {
+      "warning": "#FFBB00",
+      "warning_30_percent": "rgba(255, 187, 0, 0.3)",
+      "warning_9_percent": "rgba(255, 187, 0, 0.09)",
+      "error": "#EE2C4A",
+      "error_20_percent": "rgba(238, 44, 74, 0.2)",
+      "error_5_percent": "rgba(238, 44, 74, 0.05)",
+      "success": "#44CC77",
+      "success_30_percent": "rgba(68, 204, 119, 0.3)",
+      "success_9_percent": "rgba(68, 204, 119, 0.09)",
+      "jeans": "#44C077",
+      "jeans_30_percent": "rgba(68, 192, 119, 0.3)",
+      "jeans_9_percent": "rgba(68, 192, 119, 0.09)"
+    },
+    "highlight": {
+      "highlight_bk": "rgba(255, 122, 69, 0.87)",
+      "highlight_ck": "rgba(250, 219, 20, 0.87)",
+      "highlight_sk": "rgba(255, 94, 210, 0.87)"
+    },
+    "charts": {
+      "chart_1": "#2673DD",
+      "chart_2": "#44CC77",
+      "chart_3": "#FFBB00",
+      "chart_4": "#EE2C4A",
+      "chart_5": "#44C077"
+    }
+  },
+  "dark_mode": {
+    "theme_name": "Dark Mode",
+    "description": "Exact match with light mode",
+    "text": {
+      "text_87_percent": "rgba(255, 255, 255, 0.87)",
+      "text_60_percent": "rgba(255, 255, 255, 0.6)",
+      "text_38_percent": "rgba(255, 255, 255, 0.38)"
+    },
+    "surface": {
+      "background": "#121212",
+      "panel": "#222222",
+      "border": "rgba(255, 255, 255, 0.09)"
+    },
+    "primary": {
+      "primary": "#2673DD",
+      "primary_30_percent": "rgba(38, 115, 221, 0.3)",
+      "primary_14_percent": "rgba(38, 115, 221, 0.14)"
+    },
+    "status": {
+      "warning": "#B28400",
+      "warning_30_percent": "rgba(178, 132, 0, 0.3)",
+      "warning_14_percent": "rgba(178, 132, 0, 0.14)",
+      "error": "#A82830",
+      "error_30_percent": "rgba(168, 40, 48, 0.3)",
+      "error_14_percent": "rgba(168, 40, 48, 0.14)",
+      "success": "#309053",
+      "success_30_percent": "rgba(48, 144, 83, 0.3)",
+      "success_14_percent": "rgba(48, 144, 83, 0.14)",
+      "jeans": "#55768E",
+      "jeans_30_percent": "rgba(85, 118, 142, 0.3)",
+      "jeans_14_percent": "rgba(85, 118, 142, 0.14)"
+    },
+    "highlight": {
+      "highlight_bk": "rgba(255, 122, 69, 0.87)",
+      "highlight_ck": "rgba(250, 219, 20, 0.87)",
+      "highlight_sk": "rgba(255, 94, 210, 0.87)"
+    },
+    "charts": {
+      "chart_1": "#2673DD",
+      "chart_2": "#309053",
+      "chart_3": "#B28400",
+      "chart_4": "#A82830",
+      "chart_5": "#55768E"
+    },
+    "background_levels": {
+      "level_0": "#121212",
+      "level_1": "#1E1E1E",
+      "level_2": "#242424",
+      "level_3": "#222222",
+      "level_4": "#2C2C2C",
+      "level_5": "#323232"
+    }
+  }
+}
