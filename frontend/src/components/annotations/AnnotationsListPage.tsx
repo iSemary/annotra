@@ -366,11 +366,6 @@ export function AnnotationsListPage({
             ? "Annotations"
             : `${fileTypeFilter.charAt(0).toUpperCase()}${fileTypeFilter.slice(1)} annotations`}
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {listScope === "global"
-            ? "All annotation assets in your workspace (every project)."
-            : "Manage annotation assets for this project."}
-        </p>
       </div>
 
       <Collapsible open={openCreate} onOpenChange={setOpenCreate}>
@@ -385,7 +380,7 @@ export function AnnotationsListPage({
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-4">
-          <div className="w-full rounded-lg border bg-card p-4 space-y-4">
+          <div className="w-full rounded-lg border border-border bg-card p-4 text-card-foreground space-y-4">
             {!canWriteMedia && (
               <p className="text-sm text-amber-600 dark:text-amber-500">
                 Upload requires <code className="text-xs">media:write</code>.
@@ -565,7 +560,7 @@ export function AnnotationsListPage({
         </div>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border border-border bg-card text-card-foreground">
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

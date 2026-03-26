@@ -1,5 +1,6 @@
 'use client'
 
+import Link from "next/link"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -64,7 +65,9 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Log in</CardTitle>
-          <CardDescription>Access your account.</CardDescription>
+          <CardDescription>
+            Your annotation hub.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -117,6 +120,12 @@ export default function LoginPage() {
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? "Logging in..." : "Log in"}
               </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <Link href="/register" className="text-primary underline">
+                  Create one
+                </Link>
+              </p>
             </form>
           </Form>
         </CardContent>
