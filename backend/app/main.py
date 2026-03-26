@@ -3,12 +3,14 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
 
 from core.config import get_settings
 from core.exceptions import AppException
 from core.middleware import RequestLoggingMiddleware
 from routes.auth import router as auth_router
 from routes.dashboard import router as dashboard_router
+from routes.media import router as media_router
 from routes.permissions import router as permissions_router
 from routes.projects import router as projects_router
 from routes.roles import router as roles_router
@@ -99,6 +101,16 @@ def create_app() -> FastAPI:
     application.include_router(permissions_router, prefix=api)
     application.include_router(projects_router, prefix=api)
     application.include_router(dashboard_router, prefix=api)
+    application.include_router(media_router, prefix=api)
+
+    if settings.MEDIA_STORAGE.lower() != "aws":
+        storage_dir = settings.media_local_path_resolved
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        application.mount(
+            "/storage",
+            StaticFiles(directory=str(storage_dir)),
+            name="storage",
+        )
 
     return application
 

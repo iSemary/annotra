@@ -7,7 +7,11 @@
   "variable": [
     { "key": "base_url", "value": "http://127.0.0.1:8006" },
     { "key": "access_token", "value": "" },
-    { "key": "project_id", "value": "" }
+    { "key": "project_id", "value": "" },
+    { "key": "media_id", "value": "" },
+    { "key": "user_id", "value": "" },
+    { "key": "role_id", "value": "" },
+    { "key": "permission_id", "value": "" }
   ],
   "item": [
     {
@@ -120,6 +124,117 @@
             ],
             "url": "{{base_url}}/api/v1/dashboard/summary"
           }
+        },
+        {
+          "name": "Media list (superuser)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/dashboard/media?page=1&per_page=10&kind=all"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Media",
+      "item": [
+        {
+          "name": "Upload file",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const d = j.data;",
+                  "if (d && d.id) {",
+                  "  pm.collectionVariables.set('media_id', d.id);",
+                  "  if (pm.environment) pm.environment.set('media_id', d.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/media/upload"
+          }
+        },
+        {
+          "name": "Upload bulk",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{base_url}}/api/v1/media/upload/bulk"
+          }
+        },
+        {
+          "name": "Get media",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/media/{{media_id}}"
+          }
+        },
+        {
+          "name": "Delete media",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/media/{{media_id}}"
+          }
         }
       ]
     },
@@ -128,6 +243,22 @@
       "item": [
         {
           "name": "List users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const items = j.data && j.data.items;",
+                  "if (items && items.length) {",
+                  "  pm.collectionVariables.set('user_id', items[0].id);",
+                  "  if (pm.environment) pm.environment.set('user_id', items[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -142,6 +273,22 @@
         },
         {
           "name": "Create user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const d = j.data;",
+                  "if (d && d.id) {",
+                  "  pm.collectionVariables.set('user_id', d.id);",
+                  "  if (pm.environment) pm.environment.set('user_id', d.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -154,9 +301,75 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"full_name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"phone\": \"+12025550200\",\n  \"password\": \"password123\",\n  \"role_id\": \"REPLACE_WITH_ROLE_UUID\"\n}"
+              "raw": "{\n  \"full_name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"phone\": \"+12025550200\",\n  \"password\": \"password123\",\n  \"role_id\": \"{{role_id}}\"\n}"
             },
             "url": "{{base_url}}/api/v1/users"
+          }
+        },
+        {
+          "name": "Get user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/users/{{user_id}}"
+          }
+        },
+        {
+          "name": "Update user",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Jane Doe (updated)\",\n  \"phone\": \"+12025550201\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/users/{{user_id}}"
+          }
+        },
+        {
+          "name": "Patch user role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_id\": \"{{role_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/users/{{user_id}}/role"
+          }
+        },
+        {
+          "name": "Delete user",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/users/{{user_id}}"
           }
         }
       ]
@@ -166,6 +379,22 @@
       "item": [
         {
           "name": "List roles",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const items = j.data && j.data.items;",
+                  "if (items && items.length) {",
+                  "  pm.collectionVariables.set('role_id', items[0].id);",
+                  "  if (pm.environment) pm.environment.set('role_id', items[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -177,6 +406,88 @@
             ],
             "url": "{{base_url}}/api/v1/roles?page=1&page_size=10"
           }
+        },
+        {
+          "name": "Create role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const d = j.data;",
+                  "if (d && d.id) {",
+                  "  pm.collectionVariables.set('role_id', d.id);",
+                  "  if (pm.environment) pm.environment.set('role_id', d.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Analyst\",\n  \"hierarchy_level\": 50,\n  \"permission_ids\": []\n}"
+            },
+            "url": "{{base_url}}/api/v1/roles"
+          }
+        },
+        {
+          "name": "Get role",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/roles/{{role_id}}"
+          }
+        },
+        {
+          "name": "Update role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Analyst (updated)\",\n  \"hierarchy_level\": 55,\n  \"permission_ids\": []\n}"
+            },
+            "url": "{{base_url}}/api/v1/roles/{{role_id}}"
+          }
+        },
+        {
+          "name": "Delete role",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/roles/{{role_id}}"
+          }
         }
       ]
     },
@@ -185,6 +496,22 @@
       "item": [
         {
           "name": "List permissions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const items = j.data && j.data.items;",
+                  "if (items && items.length) {",
+                  "  pm.collectionVariables.set('permission_id', items[0].id);",
+                  "  if (pm.environment) pm.environment.set('permission_id', items[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -195,6 +522,88 @@
               }
             ],
             "url": "{{base_url}}/api/v1/permissions?page=1&page_size=10"
+          }
+        },
+        {
+          "name": "Get permission",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/permissions/{{permission_id}}"
+          }
+        },
+        {
+          "name": "Create permission",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const d = j.data;",
+                  "if (d && d.id) {",
+                  "  pm.collectionVariables.set('permission_id', d.id);",
+                  "  if (pm.environment) pm.environment.set('permission_id', d.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"custom:demo\",\n  \"description\": \"Demo permission (superuser only)\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/permissions"
+          }
+        },
+        {
+          "name": "Update permission",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/permissions/{{permission_id}}"
+          }
+        },
+        {
+          "name": "Delete permission",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/permissions/{{permission_id}}"
           }
         }
       ]

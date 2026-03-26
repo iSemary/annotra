@@ -16,6 +16,7 @@ from db.base import Base
 from models import (  # noqa: F401 - register models
     AuditLog,
     Company,
+    Media,
     Permission,
     Project,
     RefreshToken,
