@@ -12,6 +12,7 @@ from core.exceptions import AppException
 from core.security import decode_access_token
 from db.session import get_async_session
 from models.company import Company
+from models.permission import Permission
 from models.role import Role
 from models.user import User
 
@@ -70,6 +71,11 @@ async def build_request_context(token: str, session: AsyncSession) -> RequestCon
         raise AppException(403, "Company not found")
 
     codes = frozenset(p.code for p in role.permissions if p.deleted_at is None)
+    if user.is_superuser:
+        all_codes = await session.execute(
+            select(Permission.code).where(Permission.deleted_at.is_(None)),
+        )
+        codes = frozenset(all_codes.scalars().all())
 
     return RequestContext(
         user_id=user.id,
@@ -107,7 +113,7 @@ async def get_current_context_optional(
 
 def require_permission(code: str):
     async def checker(ctx: Annotated[RequestContext, Depends(get_current_context)]) -> RequestContext:
-        if code not in ctx.permission_codes:
+        if not ctx.is_superuser and code not in ctx.permission_codes:
             raise AppException(403, f"Missing permission: {code}")
         return ctx
 
@@ -116,7 +122,7 @@ def require_permission(code: str):
 
 def require_any_permission(*codes: str):
     async def checker(ctx: Annotated[RequestContext, Depends(get_current_context)]) -> RequestContext:
-        if not any(c in ctx.permission_codes for c in codes):
+        if not ctx.is_superuser and not any(c in ctx.permission_codes for c in codes):
             raise AppException(403, "Insufficient permissions")
         return ctx
 

@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
 import { getProject, type Project } from "@/lib/projects"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -14,7 +12,7 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -42,7 +40,9 @@ export default function ProjectDetailPage() {
       return
     }
     let cancelled = false
-    setLoading(true)
+    queueMicrotask(() => {
+      if (!cancelled) setLoading(true)
+    })
     getProject(id)
       .then((proj) => {
         if (!cancelled) setProject(proj)
@@ -72,20 +72,13 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="min-h-full space-y-6 bg-background text-foreground">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard/projects">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold truncate">{project.name}</h1>
-          {project.description && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {project.description}
-            </p>
-          )}
-        </div>
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold truncate">{project.name}</h1>
+        {project.description && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {project.description}
+          </p>
+        )}
       </div>
 
       <Card>

@@ -1,3 +1,6 @@
+from models.annotation import Annotation
+from models.annotation_asset import AnnotationAsset
+from models.annotation_asset_media import AnnotationAssetMedia
 from models.audit_log import AuditLog
 from models.company import Company
 from models.media import Media
@@ -9,6 +12,9 @@ from models.role import Role, role_permission_table
 from models.user import User
 
 __all__ = [
+    "Annotation",
+    "AnnotationAsset",
+    "AnnotationAssetMedia",
     "AuditLog",
     "Company",
     "Media",

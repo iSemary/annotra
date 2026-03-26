@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useAuth } from '@/context/auth-context';
 import { ConfirmDialogProvider } from '@/components/ui/confirm-dialog';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { toast } from 'sonner';
 import {
   Settings as SettingsIcon,
@@ -24,23 +25,217 @@ import {
   ChevronDown,
   ChevronRight,
   FolderOpen,
+  FileUp,
+  Tags,
+  LayoutGrid,
+  Image as ImageIcon,
+  Video,
+  AudioLines,
+  Database,
 } from 'lucide-react';
+import type { AuthUser } from '@/lib/api';
+import {
+  canAccessAnnotationsHub,
+  canReadAnnotationModality,
+  canReadAnyAnnotationModality,
+  parseDashboardProjectId,
+  projectAnnotationNavActive,
+} from '@/lib/annotation-nav';
+import {
+  applyDashboardColors,
+  readDashboardColorsFromStorage,
+} from '@/lib/dashboard-colors';
+
+function SidebarAnnotationChildLink({
+  href,
+  icon: Icon,
+  label,
+  active,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={[
+        'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+        active
+          ? 'bg-muted text-foreground'
+          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+      ].join(' ')}
+    >
+      <Icon className="h-5 w-5" />
+      <span>{label}</span>
+    </Link>
+  );
+}
+
+function DashboardAnnotationsSidebar({ user }: { user: AuthUser | null }) {
+  const pathname = usePathname();
+
+  if (!canAccessAnnotationsHub(user)) return null;
+
+  const projectId = parseDashboardProjectId(pathname);
+  const hub = '/dashboard/annotations';
+
+  const rows: React.ReactNode[] = [];
+
+  if (projectId && user?.permissions?.includes('projects:read')) {
+    const base = `/dashboard/projects/${projectId}/annotations`;
+    if (canReadAnyAnnotationModality(user)) {
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-all"
+          href={base}
+          icon={LayoutGrid}
+          label="All"
+          active={projectAnnotationNavActive(pathname, projectId, 'all')}
+        />,
+      );
+    }
+    if (canReadAnnotationModality(user, 'image')) {
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-img"
+          href={`${base}/images`}
+          icon={ImageIcon}
+          label="Images"
+          active={projectAnnotationNavActive(pathname, projectId, 'image')}
+        />,
+      );
+    }
+    if (canReadAnnotationModality(user, 'video')) {
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-vid"
+          href={`${base}/videos`}
+          icon={Video}
+          label="Videos"
+          active={projectAnnotationNavActive(pathname, projectId, 'video')}
+        />,
+      );
+    }
+    if (canReadAnnotationModality(user, 'audio')) {
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-aud"
+          href={`${base}/audios`}
+          icon={AudioLines}
+          label="Audios"
+          active={projectAnnotationNavActive(pathname, projectId, 'audio')}
+        />,
+      );
+    }
+    if (canReadAnnotationModality(user, 'dataset')) {
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-ds"
+          href={`${base}/datasets`}
+          icon={Database}
+          label="Datasets"
+          active={projectAnnotationNavActive(pathname, projectId, 'dataset')}
+        />,
+      );
+    }
+  } else {
+    if (canReadAnyAnnotationModality(user)) {
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-all"
+          href={hub}
+          icon={LayoutGrid}
+          label="All"
+          active={pathname === hub}
+        />,
+      );
+    }
+    if (canReadAnnotationModality(user, 'image')) {
+      const href = `${hub}/images`;
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-img"
+          href={href}
+          icon={ImageIcon}
+          label="Images"
+          active={pathname === href}
+        />,
+      );
+    }
+    if (canReadAnnotationModality(user, 'video')) {
+      const href = `${hub}/videos`;
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-vid"
+          href={href}
+          icon={Video}
+          label="Videos"
+          active={pathname === href}
+        />,
+      );
+    }
+    if (canReadAnnotationModality(user, 'audio')) {
+      const href = `${hub}/audios`;
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-aud"
+          href={href}
+          icon={AudioLines}
+          label="Audios"
+          active={pathname === href}
+        />,
+      );
+    }
+    if (canReadAnnotationModality(user, 'dataset')) {
+      const href = `${hub}/datasets`;
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-ds"
+          href={href}
+          icon={Database}
+          label="Datasets"
+          active={pathname === href}
+        />,
+      );
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  return (
+    <>
+      <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+        Annotations
+      </p>
+      {rows}
+    </>
+  );
+}
+
+function defaultNavIconActive(pathname: string, hrefPath: string): boolean {
+  return hrefPath === '/dashboard'
+    ? pathname === hrefPath
+    : pathname === hrefPath || pathname.startsWith(hrefPath + '/');
+}
 
 function NavIconLink({
   href,
   icon: Icon,
   label,
+  isActive,
 }: {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  isActive?: (pathname: string, hrefPath: string) => boolean;
 }) {
   const pathname = usePathname();
   const hrefPath = href.split('#')[0];
-  const active =
-    hrefPath === '/dashboard'
-      ? pathname === hrefPath
-      : pathname === hrefPath || pathname.startsWith(hrefPath + '/');
+  const active = isActive
+    ? isActive(pathname, hrefPath)
+    : defaultNavIconActive(pathname, hrefPath);
 
   return (
     <Tooltip>
@@ -93,6 +288,65 @@ function SidebarNavLink({
       <Icon className="h-5 w-5" />
       <span>{label}</span>
     </Link>
+  );
+}
+
+function ProjectAnnotationTopNav({ user }: { user: AuthUser | null }) {
+  const pathname = usePathname();
+  const projectId = parseDashboardProjectId(pathname);
+  if (!projectId) return null;
+  if (!user?.permissions?.includes('projects:read')) return null;
+  if (!canAccessAnnotationsHub(user)) return null;
+
+  const base = `/dashboard/projects/${projectId}/annotations`;
+
+  return (
+    <>
+      <span
+        className="mx-0.5 hidden h-6 w-px shrink-0 bg-border md:block"
+        aria-hidden
+      />
+      {canReadAnyAnnotationModality(user) && (
+        <NavIconLink
+          href={base}
+          icon={LayoutGrid}
+          label="All annotations"
+          isActive={(p) => projectAnnotationNavActive(p, projectId, 'all')}
+        />
+      )}
+      {canReadAnnotationModality(user, 'image') && (
+        <NavIconLink
+          href={`${base}/images`}
+          icon={ImageIcon}
+          label="Image annotations"
+          isActive={(p) => projectAnnotationNavActive(p, projectId, 'image')}
+        />
+      )}
+      {canReadAnnotationModality(user, 'video') && (
+        <NavIconLink
+          href={`${base}/videos`}
+          icon={Video}
+          label="Video annotations"
+          isActive={(p) => projectAnnotationNavActive(p, projectId, 'video')}
+        />
+      )}
+      {canReadAnnotationModality(user, 'audio') && (
+        <NavIconLink
+          href={`${base}/audios`}
+          icon={AudioLines}
+          label="Audio annotations"
+          isActive={(p) => projectAnnotationNavActive(p, projectId, 'audio')}
+        />
+      )}
+      {canReadAnnotationModality(user, 'dataset') && (
+        <NavIconLink
+          href={`${base}/datasets`}
+          icon={Database}
+          label="Dataset annotations"
+          isActive={(p) => projectAnnotationNavActive(p, projectId, 'dataset')}
+        />
+      )}
+    </>
   );
 }
 
@@ -214,6 +468,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       toast.message('Select a Facebook page to finish connecting');
   }, [searchParams]);
 
+  useEffect(() => {
+    if (loading || !isAuthenticated) return;
+    applyDashboardColors(readDashboardColorsFromStorage());
+  }, [loading, isAuthenticated]);
+
   if (loading) return null;
   if (!isAuthenticated) return null;
 
@@ -235,6 +494,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                     icon={Home}
                     label="Home"
                   />
+                  <NavIconLink
+                    href="/dashboard/media"
+                    icon={FileUp}
+                    label="Media"
+                  />
                   {user?.permissions?.includes('projects:read') && (
                     <NavIconLink
                       href="/dashboard/projects"
@@ -242,6 +506,14 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                       label="Projects"
                     />
                   )}
+                  {canAccessAnnotationsHub(user) && (
+                    <NavIconLink
+                      href="/dashboard/annotations"
+                      icon={Tags}
+                      label="Annotations"
+                    />
+                  )}
+                  <ProjectAnnotationTopNav user={user} />
                   <NavIconLink
                     href="/dashboard/settings"
                     icon={SettingsIcon}
@@ -270,7 +542,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                   )}
                 </nav>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
                 <span className="hidden text-sm text-muted-foreground md:inline">
                   {displayName}
                 </span>
@@ -291,6 +564,11 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                       icon={Home}
                       label="Home"
                     />
+                    <SidebarNavLink
+                      href="/dashboard/media"
+                      icon={FileUp}
+                      label="Media"
+                    />
                     {user?.permissions?.includes('projects:read') && (
                       <SidebarNavLink
                         href="/dashboard/projects"
@@ -298,6 +576,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                         label="Projects"
                       />
                     )}
+                    <DashboardAnnotationsSidebar user={user} />
                     <p className="px-3 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
                       Administration
                     </p>

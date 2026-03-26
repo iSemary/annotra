@@ -8,6 +8,7 @@ from starlette.staticfiles import StaticFiles
 from core.config import get_settings
 from core.exceptions import AppException
 from core.middleware import RequestLoggingMiddleware
+from routes.annotation_assets import router as annotation_assets_router
 from routes.auth import router as auth_router
 from routes.dashboard import router as dashboard_router
 from routes.media import router as media_router
@@ -102,6 +103,7 @@ def create_app() -> FastAPI:
     application.include_router(projects_router, prefix=api)
     application.include_router(dashboard_router, prefix=api)
     application.include_router(media_router, prefix=api)
+    application.include_router(annotation_assets_router, prefix=api)
 
     if settings.MEDIA_STORAGE.lower() != "aws":
         storage_dir = settings.media_local_path_resolved

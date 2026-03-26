@@ -1,46 +1,73 @@
-import api from "./api"
+import api, { type PaginationMeta, readResponsePagination } from "./api"
 
-export interface MediaItem {
-  id: number
-  url: string
-  filename: string
+export type MediaKind = "image" | "video" | "audio" | "model_3d"
+
+export interface MediaRecord {
+  id: string
+  kind: MediaKind
+  storage_key: string
   mime_type: string
-  size: number
+  size_bytes: number | null
+  user_id: string | null
+  created_at: string
+  updated_at: string
+  url: string
 }
 
-export interface UploadMediaResponse {
-  data: MediaItem
+export interface ListMediaParams {
+  page?: number
+  per_page?: number
+  kind?: MediaKind
+}
+
+export interface ListMediaResult {
+  items: MediaRecord[]
+  pagination: PaginationMeta | null
 }
 
 /**
- * Upload a file. Optionally attach to an entity (e.g. card) via attachable_type/attachable_id.
- * Returns the created media with id, url, filename, mime_type, size.
+ * Paginated list of the current user's uploads.
  */
-export async function uploadFile(
-  file: File,
-  options?: { attachableType?: string; attachableId?: number }
-): Promise<MediaItem> {
+export async function listMedia(
+  params: ListMediaParams = {},
+): Promise<ListMediaResult> {
+  const { page = 1, per_page = 200, kind } = params
+  const search = new URLSearchParams({
+    page: String(page),
+    per_page: String(per_page),
+  })
+  if (kind) search.set("kind", kind)
+  const r = await api.get(`/media?${search.toString()}`)
+  const body = r.data as { items: MediaRecord[] }
+  return {
+    items: body.items ?? [],
+    pagination: readResponsePagination(r),
+  }
+}
+
+/**
+ * Upload a single file (multipart field `file`).
+ */
+export async function uploadFile(file: File): Promise<MediaRecord> {
   const formData = new FormData()
   formData.append("file", file)
-  if (options?.attachableType) formData.append("attachable_type", options.attachableType)
-  if (options?.attachableId != null) formData.append("attachable_id", String(options.attachableId))
-  const { data } = await api.post<UploadMediaResponse>("/media/upload", formData, {
+  const r = await api.post<MediaRecord>("/media/upload", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   })
-  return data.data
+  return r.data as MediaRecord
 }
 
 /**
- * List attachments for a card.
+ * Fetch one media row by id (must be owned by the current user).
  */
-export async function getCardAttachments(cardId: number): Promise<MediaItem[]> {
-  const { data } = await api.get<{ data: MediaItem[] }>(`/cards/${cardId}/attachments`)
-  return data.data
+export async function getMedia(id: string): Promise<MediaRecord> {
+  const r = await api.get<MediaRecord>(`/media/${id}`)
+  return r.data as MediaRecord
 }
 
 /**
- * Delete a media record (and file on server).
+ * Delete a media record and its stored object.
  */
-export async function deleteMedia(id: number): Promise<void> {
+export async function deleteMedia(id: string): Promise<void> {
   await api.delete(`/media/${id}`)
 }

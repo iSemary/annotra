@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Dev Tools",
-  description: "Frontend for Dev Tools",
+  title: "Annotra",
+  description: "Frontend for Annotra",
   icons: {
     icon: [
       { url: "/assets/favicon.svg", type: "image/svg+xml" },
@@ -43,7 +43,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <AuthProvider>{children}</AuthProvider>
           <Toaster richColors />
         </ThemeProvider>

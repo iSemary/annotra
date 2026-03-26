@@ -9,6 +9,10 @@
     { "key": "access_token", "value": "" },
     { "key": "project_id", "value": "" },
     { "key": "media_id", "value": "" },
+    { "key": "annotation_asset_id", "value": "" },
+    { "key": "annotation_id", "value": "" },
+    { "key": "dataset_media_id_a", "value": "" },
+    { "key": "dataset_media_id_b", "value": "" },
     { "key": "user_id", "value": "" },
     { "key": "role_id", "value": "" },
     { "key": "permission_id", "value": "" }
@@ -144,6 +148,20 @@
     {
       "name": "Media",
       "item": [
+        {
+          "name": "List my media",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/media?page=1&per_page=50"
+          }
+        },
         {
           "name": "Upload file",
           "event": [
@@ -704,6 +722,370 @@
               }
             ],
             "url": "{{base_url}}/api/v1/projects/{{project_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Annotation assets (image)",
+      "item": [
+        {
+          "name": "List annotation assets",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets?project_id={{project_id}}&page=1&per_page=10"
+          }
+        },
+        {
+          "name": "Create image asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_asset_id', j.data.id);",
+                  "  if (pm.environment) pm.environment.set('annotation_asset_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{project_id}}\",\n  \"file_type\": \"image\",\n  \"title\": \"Postman image asset\",\n  \"status\": \"draft\",\n  \"primary_media_id\": \"{{media_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets"
+          }
+        },
+        {
+          "name": "Create dataset asset (2+ image media ids)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_asset_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{project_id}}\",\n  \"file_type\": \"dataset\",\n  \"title\": \"Postman dataset\",\n  \"status\": \"draft\",\n  \"dataset_media_ids\": [\"{{dataset_media_id_a}}\", \"{{dataset_media_id_b}}\"]\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets"
+          }
+        },
+        {
+          "name": "Get annotation asset",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}"
+          }
+        },
+        {
+          "name": "Patch annotation asset",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Renamed image asset\",\n  \"status\": \"in_progress\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}"
+          }
+        },
+        {
+          "name": "List annotations",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/annotations"
+          }
+        },
+        {
+          "name": "Create image_bbox annotation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"annotation_kind\": \"image_bbox\",\n  \"payload\": {\n    \"label\": \"car\",\n    \"bbox\": { \"x\": 10, \"y\": 20, \"w\": 80, \"h\": 40 }\n  }\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/annotations"
+          }
+        },
+        {
+          "name": "Patch annotation",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payload\": {\n    \"label\": \"car (updated)\",\n    \"bbox\": { \"x\": 12, \"y\": 22, \"w\": 80, \"h\": 40 }\n  }\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/annotations/{{annotation_id}}"
+          }
+        },
+        {
+          "name": "Export JSON",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/export?format=json"
+          }
+        },
+        {
+          "name": "Export CSV",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/export?format=csv"
+          }
+        },
+        {
+          "name": "Export COCO",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/export?format=coco"
+          }
+        },
+        {
+          "name": "Delete annotation",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/annotations/{{annotation_id}}"
+          }
+        },
+        {
+          "name": "Delete annotation asset",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Annotation assets (video)",
+      "item": [
+        {
+          "name": "Create video asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_asset_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{project_id}}\",\n  \"file_type\": \"video\",\n  \"title\": \"Postman video asset\",\n  \"status\": \"draft\",\n  \"primary_media_id\": \"{{media_id}}\",\n  \"frame_count\": 300\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets"
+          }
+        },
+        {
+          "name": "Create video_frame_bbox annotation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"annotation_kind\": \"video_frame_bbox\",\n  \"payload\": {\n    \"frame\": 60,\n    \"label\": \"car\",\n    \"bbox\": { \"x\": 120, \"y\": 200, \"w\": 80, \"h\": 40 }\n  }\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/annotations"
+          }
+        },
+        {
+          "name": "Create video_track annotation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"annotation_kind\": \"video_track\",\n  \"payload\": {\n    \"object_id\": \"car_1\",\n    \"label\": \"car\",\n    \"w\": 80,\n    \"h\": 40,\n    \"frames\": [\n      { \"frame\": 10, \"x\": 100, \"y\": 200 },\n      { \"frame\": 11, \"x\": 110, \"y\": 205 },\n      { \"frame\": 12, \"x\": 120, \"y\": 210 }\n    ]\n  }\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/annotations"
+          }
+        },
+        {
+          "name": "Export video asset (JSON)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/export?format=json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Annotation assets (audio)",
+      "item": [
+        {
+          "name": "Create audio asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_asset_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{project_id}}\",\n  \"file_type\": \"audio\",\n  \"title\": \"Postman audio asset\",\n  \"status\": \"draft\",\n  \"primary_media_id\": \"{{media_id}}\",\n  \"duration_seconds\": 12.5\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets"
+          }
+        },
+        {
+          "name": "Create audio_segment annotation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"annotation_kind\": \"audio_segment\",\n  \"payload\": {\n    \"start\": 7.0,\n    \"end\": 7.8,\n    \"label\": \"Hello\"\n  }\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/annotations"
+          }
+        },
+        {
+          "name": "Export audio asset (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/export?format=csv"
           }
         }
       ]

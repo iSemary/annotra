@@ -2,7 +2,7 @@
 
 Binary files are stored locally or on S3; metadata lives in the `media` table (`storage_key`, `mime_type`, `size_bytes`, optional `user_id`, timestamps). Keys look like `{user_id}/{year}/{month}/{uuid}.{ext}`.
 
-**API** (Bearer token): `POST /api/v1/media/upload` (field `file`), `POST /api/v1/media/upload/bulk` (field `files`, max 10), `GET` / `DELETE /api/v1/media/{id}`. Responses use the usual envelope; body fields are snake_case and include `url`.
+**API** (Bearer token): `GET /api/v1/media` (paginated `items` for the current user; query `page`, `per_page` ≤ 200, optional `kind`), `POST /api/v1/media/upload` (field `file`), `POST /api/v1/media/upload/bulk` (field `files`, max 10), `GET` / `DELETE /api/v1/media/{id}`. Responses use the usual envelope; body fields are snake_case and include `url`.
 
 **Dashboard:** `GET /api/v1/dashboard/media` — `kind` filter: `all` | `image` | `video` | `audio` | `model_3d`. Superuser only.
 

@@ -4,7 +4,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.rbac import RequestContext, require_permission, require_superuser
+from core.rbac import (
+    RequestContext,
+    require_any_permission,
+    require_permission,
+    require_superuser,
+)
 from db.session import get_async_session
 from services.dashboard_service import DashboardService
 from services.media_service import MediaService
@@ -18,6 +23,19 @@ async def dashboard_summary(
     ctx: Annotated[RequestContext, Depends(require_permission("dashboard:read"))],
 ):
     data = DashboardService.summary(ctx)
+    return success_json(message="OK", data=data)
+
+
+@router.get("/workspace-stats")
+async def dashboard_workspace_stats(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    ctx: Annotated[
+        RequestContext,
+        Depends(require_any_permission("dashboard:read", "projects:read")),
+    ],
+):
+    svc = DashboardService(session)
+    data = await svc.workspace_stats(ctx)
     return success_json(message="OK", data=data)
 
 

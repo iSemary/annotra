@@ -6,8 +6,8 @@
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Dev Tools">
-    <title>Dev Tools</title>
+    aria-label="Annotra">
+    <title>Annotra</title>
 
     <!-- Gear outer circle -->
     <circle cx="16" cy="16" r="12" fill="#67dd82" />

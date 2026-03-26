@@ -329,3 +329,48 @@ class MediaService:
             )
 
         return items, pagination_meta(page=page, page_size=per_page, total=total)
+
+    _LIST_FOR_USER_MAX_PER_PAGE = 200
+
+    async def list_for_user(
+        self,
+        user_id: UUID,
+        *,
+        page: int,
+        per_page: int,
+        kind: str | None,
+    ) -> tuple[list[dict[str, Any]], dict[str, int]]:
+        from utils.pagination import pagination_meta
+
+        allowed_kinds = {k.value for k in MediaKind}
+        if kind is not None and kind.strip() and kind.strip() not in allowed_kinds:
+            raise AppException(
+                400,
+                f"Invalid kind. Allowed: {', '.join(sorted(allowed_kinds))}.",
+            )
+        page = max(1, page)
+        per_page = min(
+            max(1, per_page),
+            self._LIST_FOR_USER_MAX_PER_PAGE,
+        )
+        conditions: list = [Media.user_id == user_id]
+        k = kind.strip() if kind and kind.strip() else None
+        if k:
+            conditions.append(Media.kind == k)
+
+        base = select(Media).where(*conditions)
+        count_stmt = select(func.count()).select_from(base.subquery())
+        total = int((await self._session.execute(count_stmt)).scalar_one())
+        offset = (page - 1) * per_page
+        list_stmt = (
+            base.order_by(Media.created_at.desc()).offset(offset).limit(per_page)
+        )
+        result = await self._session.execute(list_stmt)
+        rows = list(result.scalars().all())
+
+        items: list[dict[str, Any]] = []
+        for m in rows:
+            url = await self.get_url_for_key(m.storage_key)
+            items.append(media_to_dict(m, url))
+
+        return items, pagination_meta(page=page, page_size=per_page, total=total)

@@ -1,11 +1,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AppException
-from core.rbac import RequestContext, get_current_context
+from core.rbac import RequestContext, get_current_context, require_permission
 from db.session import get_async_session
 from services.media_service import MediaService, media_to_dict
 from utils.responses import success_json
@@ -15,10 +15,32 @@ router = APIRouter(prefix="/media", tags=["media"])
 _BULK_MAX_FILES = 10
 
 
+@router.get("")
+async def list_my_media(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    ctx: Annotated[RequestContext, Depends(require_permission("media:read"))],
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    kind: str | None = Query(None),
+):
+    svc = MediaService(session)
+    items, meta = await svc.list_for_user(
+        ctx.user_id,
+        page=page,
+        per_page=per_page,
+        kind=kind,
+    )
+    return success_json(
+        message="OK",
+        data={"items": items},
+        pagination=meta,
+    )
+
+
 @router.post("/upload")
 async def upload_media(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    ctx: Annotated[RequestContext, Depends(get_current_context)],
+    ctx: Annotated[RequestContext, Depends(require_permission("media:write"))],
     file: UploadFile = File(...),
 ):
     body = await file.read()
@@ -38,7 +60,7 @@ async def upload_media(
 @router.post("/upload/bulk")
 async def upload_media_bulk(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    ctx: Annotated[RequestContext, Depends(get_current_context)],
+    ctx: Annotated[RequestContext, Depends(require_permission("media:write"))],
     files: list[UploadFile] = File(...),
 ):
     if not files:
@@ -71,7 +93,7 @@ async def upload_media_bulk(
 async def get_media(
     media_id: UUID,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    ctx: Annotated[RequestContext, Depends(get_current_context)],
+    ctx: Annotated[RequestContext, Depends(require_permission("media:read"))],
 ):
     svc = MediaService(session)
     media = await svc.find_by_id(media_id, ctx.user_id)
@@ -83,7 +105,7 @@ async def get_media(
 async def delete_media(
     media_id: UUID,
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    ctx: Annotated[RequestContext, Depends(get_current_context)],
+    ctx: Annotated[RequestContext, Depends(require_permission("media:write"))],
 ):
     svc = MediaService(session)
     await svc.delete(media_id, ctx.user_id)

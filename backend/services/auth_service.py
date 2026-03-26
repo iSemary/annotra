@@ -5,6 +5,7 @@ from uuid import UUID
 import pyotp
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from core.config import get_settings
 from core.exceptions import AppException
@@ -19,6 +20,7 @@ from core.security import (
     verify_password,
 )
 from models.company import Company
+from models.permission import Permission
 from models.refresh_token import RefreshToken
 from models.role import Role
 from models.user import User
@@ -61,6 +63,27 @@ class AuthService:
             two_factor_enabled=user.two_factor_enabled,
             two_factor_feature_enabled=settings.TWO_FACTOR_ENABLED,
         )
+
+    async def _permission_codes_for_user(self, user: User) -> frozenset[str]:
+        result = await self._session.execute(
+            select(User)
+            .options(selectinload(User.role).selectinload(Role.permissions))
+            .where(User.id == user.id),
+        )
+        u = result.scalar_one()
+        role = u.role
+        codes = frozenset(p.code for p in role.permissions if p.deleted_at is None)
+        if u.is_superuser:
+            r = await self._session.execute(
+                select(Permission.code).where(Permission.deleted_at.is_(None)),
+            )
+            codes = frozenset(r.scalars().all())
+        return codes
+
+    async def _user_public_with_permissions(self, user: User, slug: str) -> UserPublic:
+        base = self._user_public(user, slug)
+        perms = sorted(await self._permission_codes_for_user(user))
+        return base.model_copy(update={"permissions": perms})
 
     async def _issue_tokens(self, user: User, slug: str) -> tuple[str, str, RefreshToken]:
         access = create_access_token(
@@ -118,7 +141,10 @@ class AuthService:
             resource_type="user",
             resource_id=str(user.id),
         )
-        data = AuthTokensData(access_token=access, user=self._user_public(user, slug))
+        data = AuthTokensData(
+            access_token=access,
+            user=await self._user_public_with_permissions(user, slug),
+        )
         return data, raw_refresh
 
     async def login(self, body: LoginRequest) -> tuple[AuthTokensData, str] | dict[str, Any]:
@@ -160,7 +186,10 @@ class AuthService:
             resource_type="user",
             resource_id=str(user.id),
         )
-        data = AuthTokensData(access_token=access, user=self._user_public(user, company.slug))
+        data = AuthTokensData(
+            access_token=access,
+            user=await self._user_public_with_permissions(user, company.slug),
+        )
         return data, raw_refresh
 
     async def complete_two_factor_login(
@@ -204,7 +233,10 @@ class AuthService:
             resource_type="user",
             resource_id=str(user.id),
         )
-        data = AuthTokensData(access_token=access, user=self._user_public(user, company.slug))
+        data = AuthTokensData(
+            access_token=access,
+            user=await self._user_public_with_permissions(user, company.slug),
+        )
         return data, raw_refresh
 
     async def get_me(self, ctx: RequestContext) -> dict[str, Any]:
@@ -246,7 +278,10 @@ class AuthService:
         access, new_raw, new_rt = await self._issue_tokens(user, company.slug)
         old.replaced_by_id = new_rt.id
 
-        data = AuthTokensData(access_token=access, user=self._user_public(user, company.slug))
+        data = AuthTokensData(
+            access_token=access,
+            user=await self._user_public_with_permissions(user, company.slug),
+        )
         return data, new_raw
 
     async def logout(

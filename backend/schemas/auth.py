@@ -44,6 +44,7 @@ class UserPublic(BaseModel):
     is_superuser: bool = False
     two_factor_enabled: bool = False
     two_factor_feature_enabled: bool = True
+    permissions: list[str] = Field(default_factory=list)
 
     model_config = {"from_attributes": False}
 

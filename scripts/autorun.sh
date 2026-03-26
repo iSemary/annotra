@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Open two GUI terminal windows (Linux): Next.js (default :3000) and FastAPI (:8006).
-# Backend terminal: alembic upgrade head → python -m scripts.seed_db → uvicorn.
-# Requires: npm (frontend), Python venv under backend/.venv (recommended), a supported terminal.
+# Backend terminal: same flow as backend/README.md (venv, pip, alembic) → seed_db → uvicorn; local Postgres.
+# Requires: npm (frontend), python3-venv, a supported terminal.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-COMPOSE_FILE_Q=$(printf '%q' "$ROOT/docker-compose.yml")
+_AUTORUN_LAUNCH_N=0
 
 FRONTEND_CMD="$(cat <<EOF
 set -euo pipefail
@@ -27,49 +27,23 @@ if [[ ! -f .env ]] && [[ -f .env.example ]]; then
   cp .env.example .env
   echo "Created backend/.env from .env.example"
 fi
-if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1 && [[ -f $COMPOSE_FILE_Q ]]; then
-  echo "Starting PostgreSQL (docker compose)…"
-  if ! docker compose -f $COMPOSE_FILE_Q up -d --wait db 2>/dev/null; then
-    docker compose -f $COMPOSE_FILE_Q up -d db
-    echo "Waiting for Postgres (no compose --wait)…"
-    sleep 5
-  fi
-fi
+echo "Backend expects PostgreSQL reachable via DATABASE_URL in backend/.env (local install, not started by this script)."
 if [[ -f .env ]]; then
   set -a
   # shellcheck disable=SC1091
   source .env
   set +a
 fi
-RUN_PY=python3
-if [[ -f .venv/bin/activate ]]; then
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
-  RUN_PY=python
-  if ! "\$RUN_PY" -c "import fastapi" 2>/dev/null; then
-    pip install -q -r requirements.txt
-  fi
-elif python3 -m venv .venv 2>/dev/null && [[ -f .venv/bin/activate ]]; then
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
-  pip install -q -r requirements.txt
-  RUN_PY=python
-else
-  if ! python3 -c "import fastapi" 2>/dev/null; then
-    echo "No venv (install python3-venv for an isolated env). Installing deps for system Python…"
-    python3 -m pip install -q -r requirements.txt --break-system-packages || {
-      echo "pip failed. On Debian/Ubuntu: sudo apt install python3-venv && rm -rf .venv && re-run." >&2
-      exit 1
-    }
-  fi
-  RUN_PY=python3
-fi
-echo "Annotra backend — migrate, seed, API http://127.0.0.1:\${API_PORT:-8006}"
-"\$RUN_PY" -m alembic upgrade head
-"\$RUN_PY" -m scripts.seed_db
+python3 -m venv .venv
+# shellcheck disable=SC1091
+source .venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+echo "Annotra backend — seed, API http://127.0.0.1:\${API_PORT:-8006}"
+python -m scripts.seed_db
 API_PORT="\${API_PORT:-8006}"
 set +e
-"\$RUN_PY" -m uvicorn app.main:app --reload --host 0.0.0.0 --port "\$API_PORT"
+uvicorn app.main:app --reload --host 0.0.0.0 --port "\$API_PORT"
 exec bash -i
 EOF
 )"
@@ -77,11 +51,21 @@ EOF
 launch_terminal() {
   local title=$1
   local cmd=$2
+  _AUTORUN_LAUNCH_N=$((_AUTORUN_LAUNCH_N + 1))
 
-  if command -v gnome-terminal >/dev/null 2>&1; then
-    gnome-terminal --title="$title" -- bash -c "$cmd" &
+  if [[ -x /usr/bin/gnome-terminal.real ]]; then
+    # Ubuntu/Debian shim at /usr/bin/gnome-terminal can funnel launches into one
+    # factory; gnome-terminal.real + distinct WM role yields separate top-level windows.
+    /usr/bin/gnome-terminal.real --window --title="$title" --role="annotra-${_AUTORUN_LAUNCH_N}" -- bash -c "$cmd" &
+  elif command -v gnome-terminal >/dev/null 2>&1; then
+    # --disable-factory forces a new app instance on Ubuntu's python gnome-terminal shim.
+    if IFS= read -r _gt_line < "$(command -v gnome-terminal)" && [[ "$_gt_line" == '#!'*python* ]]; then
+      gnome-terminal --disable-factory --window --title="$title" --role="annotra-${_AUTORUN_LAUNCH_N}" -- bash -c "$cmd" &
+    else
+      gnome-terminal --window --title="$title" --role="annotra-${_AUTORUN_LAUNCH_N}" -- bash -c "$cmd" &
+    fi
   elif command -v konsole >/dev/null 2>&1; then
-    konsole -p tabtitle="$title" -e bash -c "$cmd" &
+    konsole --new-window -p tabtitle="$title" -e bash -c "$cmd" &
   elif command -v xfce4-terminal >/dev/null 2>&1; then
     xfce4-terminal -T "$title" -e bash -c "$(printf '%q' "$cmd")" &
   elif command -v alacritty >/dev/null 2>&1; then

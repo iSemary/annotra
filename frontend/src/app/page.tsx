@@ -13,7 +13,7 @@ export default function Home() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-xl">
         <CardHeader>
-          <CardTitle>Dev Tools</CardTitle>
+          <CardTitle>Annotra</CardTitle>
           <CardDescription>Sign in or create an account to get started.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">

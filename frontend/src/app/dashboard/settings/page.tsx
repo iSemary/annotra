@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useForm } from "react-hook-form"
+import { useTheme } from "next-themes"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
@@ -22,10 +23,22 @@ import {
   FormDescription,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Select2, type Select2Option } from "@/components/ui/select2"
-import { getSettings, updateSettings, type Settings } from "@/lib/settings"
+import { Select2 } from "@/components/ui/select2"
+import { getSettings, updateSettings } from "@/lib/settings"
+import {
+  applyDashboardColors,
+  clearDashboardColors,
+  colorsFromSettings,
+  dashboardColorsToSettings,
+  isDashboardColorSettingKey,
+  mergeLoadedDashboardColors,
+  readDashboardColorsFromStorage,
+  writeDashboardColorsToStorage,
+  type DashboardColorKey,
+  type DashboardColors,
+} from "@/lib/dashboard-colors"
 import { toast } from "sonner"
-import { Save } from "lucide-react"
+import { Palette, RotateCcw, Save } from "lucide-react"
 
 const settingsSchema = z.object({
   theme: z.enum(["light", "dark", "system"]).optional(),
@@ -33,75 +46,181 @@ const settingsSchema = z.object({
 
 type SettingsValues = z.infer<typeof settingsSchema>
 
+const THEME_OPTS = ["light", "dark", "system"] as const
+
+function isSavedTheme(v: string | null | undefined): v is (typeof THEME_OPTS)[number] {
+  return !!v && (THEME_OPTS as readonly string[]).includes(v)
+}
+
+const COLOR_META: {
+  key: DashboardColorKey
+  label: string
+  description: string
+}[] = [
+  {
+    key: "primary",
+    label: "Primary",
+    description: "Main buttons, key actions, and focus accents.",
+  },
+  {
+    key: "secondary",
+    label: "Secondary",
+    description: "Secondary buttons and low-emphasis surfaces.",
+  },
+  {
+    key: "accent",
+    label: "Accent",
+    description: "Hover states and highlighted rows.",
+  },
+  {
+    key: "destructive",
+    label: "Destructive",
+    description: "Delete, errors, and dangerous actions.",
+  },
+  {
+    key: "muted",
+    label: "Muted",
+    description: "Subtle backgrounds (e.g. sidebar, cards).",
+  },
+]
+
+function normalizeHex(raw: string): string {
+  const s = raw.trim()
+  if (!s) return ""
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(s)
+  return m ? `#${m[1]}` : ""
+}
+
+function ColorPickerRow({
+  label,
+  description,
+  value,
+  fallbackPicker,
+  onChange,
+}: {
+  label: string
+  description: string
+  value: string
+  fallbackPicker: string
+  onChange: (hex: string) => void
+}) {
+  const pickerValue = value || fallbackPicker
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 space-y-1">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <input
+          type="color"
+          aria-label={`${label} color`}
+          className="h-10 w-14 cursor-pointer rounded-md border border-input bg-background p-0.5 shadow-xs"
+          value={pickerValue}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <Input
+          className="w-32 font-mono text-xs"
+          placeholder="#000000"
+          value={value}
+          onChange={(e) => {
+            const n = normalizeHex(e.target.value)
+            if (n || e.target.value === "") onChange(n)
+          }}
+          spellCheck={false}
+        />
+        {value ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            onClick={() => onChange("")}
+          >
+            Reset
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
+  const { theme: nextTheme, setTheme } = useTheme()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [dashboardColors, setDashboardColors] = useState<DashboardColors>({})
   const [customSettings, setCustomSettings] = useState<
     Array<{ key: string; value: string }>
   >([])
+  const hadServerThemeRef = useRef(false)
 
   const form = useForm<SettingsValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: {
-      theme: "dark",
-    },
+    defaultValues: {},
   })
 
   useEffect(() => {
     loadSettings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
   }, [])
 
   useEffect(() => {
-    // Apply theme on mount and when theme changes
-    const applyTheme = (theme: string) => {
-      const root = document.documentElement
-      if (theme === "dark") {
-        root.classList.add("dark")
-      } else if (theme === "light") {
-        root.classList.remove("dark")
-      } else {
-        // System theme
-        const prefersDark = window.matchMedia(
-          "(prefers-color-scheme: dark)"
-        ).matches
-        if (prefersDark) {
-          root.classList.add("dark")
-        } else {
-          root.classList.remove("dark")
-        }
+    if (loading || hadServerThemeRef.current) return
+    if (nextTheme && isSavedTheme(nextTheme)) {
+      const current = form.getValues("theme")
+      if (current === undefined || current === null) {
+        form.setValue("theme", nextTheme)
       }
     }
+  }, [loading, nextTheme, form.setValue, form.getValues])
 
-    const theme = form.watch("theme")
-    if (theme) {
-      applyTheme(theme)
+  const patchDashboardColor = (key: DashboardColorKey, hex: string) => {
+    setDashboardColors((prev) => {
+      const next = { ...prev }
+      if (!hex) delete next[key]
+      else next[key] = hex
+      applyDashboardColors(next)
+      writeDashboardColorsToStorage(next)
+      return next
+    })
+  }
 
-      // Listen for system theme changes if theme is set to system
-      if (theme === "system") {
-        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-        const handleChange = () => applyTheme("system")
-        mediaQuery.addEventListener("change", handleChange)
-        return () => mediaQuery.removeEventListener("change", handleChange)
-      }
-    }
-  }, [form.watch("theme")])
+  const resetAllDashboardColors = () => {
+    setDashboardColors({})
+    clearDashboardColors()
+    writeDashboardColorsToStorage({})
+    toast.message("Dashboard colors cleared (save to sync account)")
+  }
 
   const loadSettings = async () => {
     try {
       setLoading(true)
       const settings = await getSettings()
-      
-      // Set theme if it exists
-      if (settings.theme) {
-        form.setValue("theme", settings.theme as "light" | "dark" | "system")
+
+      if (isSavedTheme(settings.theme)) {
+        hadServerThemeRef.current = true
+        form.setValue("theme", settings.theme)
+        setTheme(settings.theme)
+      } else {
+        hadServerThemeRef.current = false
       }
 
-      // Load custom settings (all settings except theme)
+      const fromApi = colorsFromSettings(settings as Record<string, string | null>)
+      const fromLocal = readDashboardColorsFromStorage()
+      const merged = mergeLoadedDashboardColors(fromApi, fromLocal)
+      setDashboardColors(merged)
+      applyDashboardColors(merged)
+      writeDashboardColorsToStorage(merged)
+
       const custom = Object.entries(settings)
-        .filter(([key]) => key !== "theme")
+        .filter(
+          ([key]) =>
+            key !== "theme" && !isDashboardColorSettingKey(key),
+        )
         .map(([key, value]) => ({ key, value: value || "" }))
       setCustomSettings(custom)
-    } catch (error: any) {
+    } catch {
       toast.error("Failed to load settings")
     } finally {
       setLoading(false)
@@ -119,7 +238,7 @@ export default function SettingsPage() {
   const handleCustomSettingChange = (
     index: number,
     field: "key" | "value",
-    value: string
+    value: string,
   ) => {
     const updated = [...customSettings]
     updated[index][field] = value
@@ -130,44 +249,30 @@ export default function SettingsPage() {
     try {
       setSaving(true)
 
-      // Combine theme and custom settings
       const allSettings: Record<string, string | null> = {}
 
-      // Add theme
       if (values.theme) {
         allSettings.theme = values.theme
       }
 
-      // Add custom settings
+      Object.assign(allSettings, dashboardColorsToSettings(dashboardColors))
+
       customSettings.forEach((setting) => {
-        if (setting.key.trim()) {
-          allSettings[setting.key.trim()] = setting.value || null
+        const k = setting.key.trim()
+        if (k && !isDashboardColorSettingKey(k)) {
+          allSettings[k] = setting.value || null
         }
       })
 
       await updateSettings(allSettings)
       toast.success("Settings saved successfully")
-      
-      // Apply theme if changed
-      if (values.theme) {
-        const root = document.documentElement
-        if (values.theme === "dark") {
-          root.classList.add("dark")
-        } else if (values.theme === "light") {
-          root.classList.remove("dark")
-        } else {
-          // System theme - check system preference
-          const prefersDark = window.matchMedia(
-            "(prefers-color-scheme: dark)"
-          ).matches
-          if (prefersDark) {
-            root.classList.add("dark")
-          } else {
-            root.classList.remove("dark")
-          }
-        }
+
+      if (values.theme && isSavedTheme(values.theme)) {
+        setTheme(values.theme)
       }
-    } catch (error: any) {
+
+      writeDashboardColorsToStorage(dashboardColors)
+    } catch {
       toast.error("Failed to save settings")
     } finally {
       setSaving(false)
@@ -176,7 +281,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-muted-foreground">Loading settings...</div>
       </div>
     )
@@ -215,17 +320,72 @@ export default function SettingsPage() {
                           { value: "system", label: "System" },
                         ]}
                         value={field.value}
-                        onChange={field.onChange}
+                        onChange={(v) => {
+                          field.onChange(v)
+                          if (v && isSavedTheme(v)) {
+                            setTheme(v)
+                          }
+                        }}
                       />
                     </FormControl>
                     <FormDescription>
                       Choose your preferred theme. System will follow your
-                      device's theme preference.
+                      device&apos;s theme preference.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-2">
+                  <Palette className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <CardTitle>Dashboard colors</CardTitle>
+                    <CardDescription>
+                      Override primary, secondary, and other tokens. Foreground
+                      text is chosen automatically for contrast. Leave empty to
+                      use the default palette for light/dark mode.
+                    </CardDescription>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={resetAllDashboardColors}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset colors
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {COLOR_META.map(({ key, label, description }) => (
+                <ColorPickerRow
+                  key={key}
+                  label={label}
+                  description={description}
+                  value={dashboardColors[key] ?? ""}
+                  fallbackPicker={
+                    key === "destructive"
+                      ? "#dc2626"
+                      : key === "muted"
+                        ? "#94a3b8"
+                        : "#3b82f6"
+                  }
+                  onChange={(hex) => patchDashboardColor(key, hex)}
+                />
+              ))}
+              <p className="text-xs text-muted-foreground pt-1">
+                Changes apply immediately in this browser. Click Save Settings to
+                sync colors to your account as well.
+              </p>
             </CardContent>
           </Card>
 
@@ -250,16 +410,13 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               {customSettings.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No custom settings. Click "Add Setting" to create one.
+                <div className="py-8 text-center text-muted-foreground">
+                  No custom settings. Click &quot;Add Setting&quot; to create one.
                 </div>
               ) : (
                 <div className="space-y-4">
                   {customSettings.map((setting, index) => (
-                    <div
-                      key={index}
-                      className="flex gap-2 items-start"
-                    >
+                    <div key={index} className="flex items-start gap-2">
                       <div className="flex-1">
                         <Input
                           placeholder="Setting key"
@@ -268,7 +425,7 @@ export default function SettingsPage() {
                             handleCustomSettingChange(
                               index,
                               "key",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                         />
@@ -281,7 +438,7 @@ export default function SettingsPage() {
                             handleCustomSettingChange(
                               index,
                               "value",
-                              e.target.value
+                              e.target.value,
                             )
                           }
                         />

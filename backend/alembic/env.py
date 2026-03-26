@@ -14,6 +14,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from core.config import get_settings
 from db.base import Base
 from models import (  # noqa: F401 - register models
+    Annotation,
+    AnnotationAsset,
+    AnnotationAssetMedia,
     AuditLog,
     Company,
     Media,
