@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { Loader2, Plus, Trash2 } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Loader2, Pause, Play, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import {
   createAnnotation,
@@ -17,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea"
 
 export function VideoAnnotationEditor({ asset }: { asset: AnnotationAsset }) {
   const url = asset.primary_media_url
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [videoPlaying, setVideoPlaying] = useState(false)
   const [rows, setRows] = useState<AnnotationRow[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -112,19 +114,46 @@ export function VideoAnnotationEditor({ asset }: { asset: AnnotationAsset }) {
     )
   }
 
+  function toggleVideoPlay() {
+    const el = videoRef.current
+    if (!el) return
+    if (el.paused) void el.play()
+    else el.pause()
+  }
+
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
-      <div className="space-y-3">
+    <div className="grid min-h-0 flex-1 gap-8 lg:grid-cols-2 lg:items-start">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         {url ? (
-          <video
-            src={url}
-            controls
-            className="w-full max-h-[360px] rounded-md border bg-black"
-          />
+          <>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={toggleVideoPlay}
+              >
+                {videoPlaying ? (
+                  <Pause className="h-4 w-4 mr-1" />
+                ) : (
+                  <Play className="h-4 w-4 mr-1" />
+                )}
+                {videoPlaying ? "Pause" : "Play"}
+              </Button>
+            </div>
+            <video
+              ref={videoRef}
+              src={url}
+              controls
+              className="w-full max-h-[360px] rounded-md border bg-black"
+              onPlay={() => setVideoPlaying(true)}
+              onPause={() => setVideoPlaying(false)}
+            />
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">No video URL.</p>
         )}
-        <ul className="text-sm space-y-2 max-h-[280px] overflow-auto border rounded-md p-3">
+        <ul className="text-sm space-y-2 max-h-[min(280px,40vh)] min-h-0 flex-1 overflow-auto border rounded-md p-3 lg:max-h-none lg:flex-1">
           {rows.map((r) => (
             <li
               key={r.id}
@@ -177,7 +206,7 @@ export function VideoAnnotationEditor({ asset }: { asset: AnnotationAsset }) {
           </div>
           <Button type="button" size="sm" onClick={addFrameBox}>
             <Plus className="h-4 w-4 mr-1" />
-            Add
+            Add annotation
           </Button>
         </div>
         <div className="rounded-lg border p-4 space-y-3">
@@ -213,7 +242,7 @@ export function VideoAnnotationEditor({ asset }: { asset: AnnotationAsset }) {
           </div>
           <Button type="button" size="sm" onClick={addTrack}>
             <Plus className="h-4 w-4 mr-1" />
-            Add track
+            Add track annotation
           </Button>
         </div>
       </div>

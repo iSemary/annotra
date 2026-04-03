@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.rbac import RequestContext, require_permission
@@ -12,6 +12,7 @@ from schemas.annotation import (
     AnnotationCreateRequest,
     AnnotationPatchRequest,
 )
+from services.annotation_asset_processing import schedule_annotation_asset_pipeline
 from services.annotation_asset_service import AnnotationAssetService
 from utils.responses import success_json
 
@@ -28,7 +29,10 @@ async def list_annotation_assets(
     ] = None,
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
-    search: str | None = Query(None),
+    search: str | None = Query(
+        None,
+        description="Matches asset title (case-insensitive) or any annotation payload text",
+    ),
     status: str | None = Query(None),
     file_type: str | None = Query(None),
     sort_by: str = Query("updated_at", pattern="^(annotations_count|updated_at|progress)$"),
@@ -51,12 +55,14 @@ async def list_annotation_assets(
 
 @router.post("")
 async def create_annotation_asset(
+    background_tasks: BackgroundTasks,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     ctx: Annotated[RequestContext, Depends(require_permission("projects:read"))],
     body: AnnotationAssetCreateRequest,
 ):
     svc = AnnotationAssetService(session)
     asset = await svc.create_asset(ctx, body)
+    await schedule_annotation_asset_pipeline(asset.id, background_tasks=background_tasks)
     data = await svc.get_asset(ctx, asset.id)
     return success_json(
         message="Annotation asset created",
@@ -145,6 +151,20 @@ async def delete_annotation(
     svc = AnnotationAssetService(session)
     await svc.delete_annotation(ctx, asset_id, annotation_id)
     return success_json(message="Annotation deleted", data={})
+
+
+@router.post("/{asset_id}/re-annotate")
+async def re_annotate_annotation_asset(
+    asset_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    ctx: Annotated[RequestContext, Depends(require_permission("projects:read"))],
+):
+    svc = AnnotationAssetService(session)
+    data = await svc.re_annotate_with_model(ctx, asset_id)
+    return success_json(
+        message="Re-annotate accepted (model integration pending)",
+        data=data,
+    )
 
 
 @router.get("/{asset_id}/export")

@@ -14,6 +14,7 @@ import {
 import { getAllRoles, type Role } from "@/lib/roles"
 import { DEFAULT_PAGE_SIZE } from "@/lib/api"
 import { Button } from "@/components/ui/button"
+import { TableActionButton } from "@/components/ui/table-action-button"
 import {
   Card,
   CardContent,
@@ -436,27 +437,23 @@ export default function UsersPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                      <div className="flex justify-end gap-1">
+                        <TableActionButton
+                          label="Edit user"
                           onClick={() => {
                             setEditingUser(user)
                             setDialogOpen(true)
                           }}
-                          title="Edit"
                         >
                           <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        </TableActionButton>
+                        <TableActionButton
+                          label="Delete user"
+                          className="text-destructive hover:text-destructive"
                           onClick={() => handleDelete(user.id)}
-                          title="Delete"
-                          className="text-red-600 hover:text-red-700"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </TableActionButton>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -468,27 +465,13 @@ export default function UsersPage() {
               <p className="text-muted-foreground">No users on this page.</p>
             </div>
           )}
-          {pagination.last_page > 1 && (
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Showing{" "}
-                {pagination.total > 0
-                  ? (currentPage - 1) * pagination.per_page + 1
-                  : 0}{" "}
-                to{" "}
-                {Math.min(
-                  currentPage * pagination.per_page,
-                  pagination.total,
-                )}{" "}
-                of {pagination.total} users
-              </div>
-              <Pagination
-                currentPage={currentPage}
-                totalPages={pagination.last_page}
-                onPageChange={setCurrentPage}
-              />
-            </div>
-          )}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={pagination.last_page}
+            onPageChange={setCurrentPage}
+            totalItems={pagination.total}
+            pageSize={pagination.per_page}
+          />
         </CardContent>
       </Card>
     </div>

@@ -1,7 +1,7 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from "axios"
 
-/** Default page size for list APIs (matches backend `PaginationQuery` default). */
-export const DEFAULT_PAGE_SIZE = 10
+/** Default page size for dashboard tables and list APIs. */
+export const DEFAULT_PAGE_SIZE = 5
 
 export interface PaginationMeta {
   page: number

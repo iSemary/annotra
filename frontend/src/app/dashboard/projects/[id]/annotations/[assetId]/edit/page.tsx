@@ -7,10 +7,7 @@ import { ArrowLeft, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { getAnnotationAsset, type AnnotationAsset } from "@/lib/annotation-assets"
 import { Button } from "@/components/ui/button"
-import { ImageAnnotationEditor } from "@/components/annotations/editors/ImageAnnotationEditor"
-import { VideoAnnotationEditor } from "@/components/annotations/editors/VideoAnnotationEditor"
-import { AudioAnnotationEditor } from "@/components/annotations/editors/AudioAnnotationEditor"
-import { DatasetAnnotationEditor } from "@/components/annotations/editors/DatasetAnnotationEditor"
+import { AnnotationAssetEditorPanel } from "@/components/annotations/AnnotationAssetEditorPanel"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -87,10 +84,7 @@ export default function EditAnnotationAssetPage() {
         </div>
       </div>
 
-      {asset.file_type === "image" && <ImageAnnotationEditor asset={asset} />}
-      {asset.file_type === "video" && <VideoAnnotationEditor asset={asset} />}
-      {asset.file_type === "audio" && <AudioAnnotationEditor asset={asset} />}
-      {asset.file_type === "dataset" && <DatasetAnnotationEditor asset={asset} />}
+      <AnnotationAssetEditorPanel asset={asset} />
     </div>
   )
 }

@@ -7,7 +7,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, cast, exists, func, or_, select
+from sqlalchemy.types import Text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -37,12 +38,21 @@ from services.project_service import ProjectService
 from utils.pagination import pagination_meta
 
 
+_DEFAULT_TITLE_LABEL = {
+    "image": "Image",
+    "video": "Video",
+    "audio": "Audio",
+    "dataset": "Dataset",
+}
+
+
 def _status_rank():
     return case(
         (AnnotationAsset.status == "draft", 0),
         (AnnotationAsset.status == "in_progress", 1),
-        (AnnotationAsset.status == "completed", 2),
-        (AnnotationAsset.status == "reviewed", 3),
+        (AnnotationAsset.status == "failed", 2),
+        (AnnotationAsset.status == "completed", 3),
+        (AnnotationAsset.status == "reviewed", 4),
         else_=0,
     )
 
@@ -68,6 +78,19 @@ class AnnotationAssetService:
     async def _get_project(self, ctx: RequestContext, project_id: UUID) -> Project:
         return await self._projects.get_by_id(ctx, project_id)
 
+    async def _next_default_asset_title(self, project_id: UUID, file_type: str) -> str:
+        r = await self._session.execute(
+            select(func.count())
+            .select_from(AnnotationAsset)
+            .where(
+                AnnotationAsset.project_id == project_id,
+                AnnotationAsset.file_type == file_type,
+            ),
+        )
+        n = int(r.scalar_one()) + 1
+        label = _DEFAULT_TITLE_LABEL.get(file_type, file_type.capitalize())
+        return f"{label} #{n}"
+
     async def _load_asset(
         self,
         ctx: RequestContext,
@@ -89,14 +112,6 @@ class AnnotationAssetService:
         await self._get_project(ctx, row.project_id)
         ensure_can_read_file_type(ctx, row.file_type)
         return row
-
-    def _count_subquery(self):
-        return (
-            select(func.count(AnnotationRow.id))
-            .where(AnnotationRow.asset_id == AnnotationAsset.id)
-            .correlate(AnnotationAsset)
-            .scalar_subquery()
-        )
 
     async def list_assets(
         self,
@@ -142,18 +157,45 @@ class AnnotationAssetService:
             filters.append(AnnotationAsset.status == status.strip())
         if search and search.strip():
             term = f"%{search.strip()}%"
-            filters.append(AnnotationAsset.title.ilike(term))
+            ann_text_match = exists(
+                select(1)
+                .select_from(AnnotationRow)
+                .where(
+                    AnnotationRow.asset_id == AnnotationAsset.id,
+                    cast(AnnotationRow.payload, Text).ilike(term),
+                ),
+            )
+            filters.append(
+                or_(AnnotationAsset.title.ilike(term), ann_text_match),
+            )
 
-        ann_count = self._count_subquery()
+        # Grouped counts (correlated scalar subqueries can return the global total on some DBs).
+        ann_per_asset = (
+            select(
+                AnnotationRow.asset_id.label("asset_id"),
+                func.count(AnnotationRow.id).label("ac"),
+            )
+            .group_by(AnnotationRow.asset_id)
+            .subquery()
+        )
+        annotations_count_col = func.coalesce(ann_per_asset.c.ac, 0)
         base = (
-            select(AnnotationAsset, ann_count.label("annotations_count"), Project.name)
+            select(
+                AnnotationAsset,
+                annotations_count_col.label("annotations_count"),
+                Project.name,
+            )
             .join(Project, AnnotationAsset.project_id == Project.id)
+            .outerjoin(
+                ann_per_asset,
+                ann_per_asset.c.asset_id == AnnotationAsset.id,
+            )
             .where(*filters)
         )
 
         order_col: Any
         if sort_by == "annotations_count":
-            order_col = ann_count
+            order_col = annotations_count_col
         elif sort_by == "progress":
             order_col = _status_rank()
         else:
@@ -194,9 +236,16 @@ class AnnotationAssetService:
         with_members: bool = False,
         project_name: str | None = None,
     ) -> dict[str, Any]:
-        if with_members and not asset.dataset_members:
+        # Avoid lazy-loading dataset_members in async code (MissingGreenlet).
+        needs_members = with_members or asset.file_type == "dataset"
+        if needs_members:
             await self._session.refresh(asset, ["dataset_members"])
-        dataset_n = len(asset.dataset_members) if asset.dataset_members else 0
+            dataset_n = len(asset.dataset_members) if asset.dataset_members else 0
+            dataset_media_ids = [str(m.media_id) for m in (asset.dataset_members or [])]
+        else:
+            dataset_n = 0
+            dataset_media_ids = []
+
         if asset.file_type == "image":
             dataset_size_value: int | float | None = 1
             dataset_size_unit = "images"
@@ -211,11 +260,30 @@ class AnnotationAssetService:
             dataset_size_unit = "images"
 
         primary_url: str | None = None
+        file_size_bytes: int | None = None
         if asset.primary_media_id:
             pm = await self._session.get(Media, asset.primary_media_id)
             if pm:
                 storage = get_media_storage()
                 primary_url = await storage.get_url(pm.storage_key)
+                file_size_bytes = pm.size_bytes
+
+        if (
+            asset.file_type == "dataset"
+            and needs_members
+            and asset.dataset_members
+        ):
+            mids = [m.media_id for m in asset.dataset_members]
+            if mids:
+                total = await self._session.scalar(
+                    select(
+                        func.coalesce(
+                            func.sum(func.coalesce(Media.size_bytes, 0)),
+                            0,
+                        ),
+                    ).where(Media.id.in_(mids)),
+                )
+                file_size_bytes = int(total or 0)
 
         out: dict[str, Any] = {
             "id": str(asset.id),
@@ -231,7 +299,8 @@ class AnnotationAssetService:
             "duration_seconds": asset.duration_seconds,
             "annotations_count": annotations_count,
             "dataset_size": {"value": dataset_size_value, "unit": dataset_size_unit},
-            "dataset_media_ids": [str(m.media_id) for m in (asset.dataset_members or [])],
+            "file_size_bytes": file_size_bytes,
+            "dataset_media_ids": dataset_media_ids,
             "created_at": asset.created_at.isoformat(),
             "updated_at": asset.updated_at.isoformat(),
         }
@@ -248,11 +317,16 @@ class AnnotationAssetService:
         ensure_can_write_file_type(ctx, body.file_type)
         await self._get_project(ctx, body.project_id)
 
+        title = body.title or await self._next_default_asset_title(
+            body.project_id,
+            body.file_type,
+        )
+        # New assets enter the processing pipeline immediately (client status is ignored).
         asset = AnnotationAsset(
             project_id=body.project_id,
             file_type=body.file_type,
-            title=body.title.strip(),
-            status=body.status,
+            title=title,
+            status="in_progress",
             frame_count=body.frame_count,
             duration_seconds=body.duration_seconds,
         )
@@ -313,6 +387,20 @@ class AnnotationAssetService:
             select(func.count()).select_from(AnnotationRow).where(AnnotationRow.asset_id == asset_id),
         )
         return int(r.scalar_one())
+
+    async def _sync_asset_status_for_annotation_count(self, asset_id: UUID) -> None:
+        """At least one annotation → completed (unless reviewed). None left after completed → in_progress."""
+        asset = await self._session.get(AnnotationAsset, asset_id)
+        if asset is None:
+            return
+        cnt = await self._annotation_count(asset_id)
+        if cnt >= 1:
+            if asset.status != "reviewed":
+                asset.status = "completed"
+        elif asset.status == "completed":
+            asset.status = "in_progress"
+        asset.updated_at = datetime.now(UTC)
+        await self._session.flush()
 
     async def patch_asset(
         self,
@@ -397,6 +485,7 @@ class AnnotationAssetService:
         self._session.add(row)
         await self._session.flush()
         await self._session.refresh(row)
+        await self._sync_asset_status_for_annotation_count(asset_id)
         return {
             "id": str(row.id),
             "annotation_kind": row.annotation_kind,
@@ -478,6 +567,15 @@ class AnnotationAssetService:
             raise AppException(404, "Annotation not found")
         await self._session.delete(row)
         await self._session.flush()
+        await self._sync_asset_status_for_annotation_count(asset_id)
+
+    async def re_annotate_with_model(self, ctx: RequestContext, asset_id: UUID) -> dict[str, Any]:
+        """Placeholder for Hugging Face (or other) model-based re-annotation."""
+        asset = await self._load_asset(ctx, asset_id, with_members=True)
+        ensure_can_write_file_type(ctx, asset.file_type)
+        # TODO: call HF inference API, map outputs to annotations, persist rows
+        cnt = await self._annotation_count(asset_id)
+        return await self._asset_to_dict(asset, cnt, with_members=True)
 
     async def export_asset(
         self,
@@ -504,8 +602,11 @@ class AnnotationAssetService:
             raw = buf.getvalue().encode("utf-8")
             return "text/csv", f"asset-{asset_id}.csv", raw
         if fmt == "coco":
-            if asset.file_type not in ("image", "dataset"):
-                raise AppException(400, "COCO export is only supported for image assets")
+            if asset.file_type not in ("image", "dataset", "audio", "video"):
+                raise AppException(
+                    400,
+                    "COCO export is not supported for this asset type",
+                )
             coco = self._build_coco(meta, ann)
             body = json.dumps(coco, indent=2).encode("utf-8")
             return "application/json", f"asset-{asset_id}-coco.json", body
@@ -541,7 +642,9 @@ class AnnotationAssetService:
                 )
             return image_id_by_key[file_key]
 
-        if meta["file_type"] == "image":
+        ft = meta["file_type"]
+
+        if ft == "image":
             fname = meta.get("title") or meta.get("id", "image")
             iid = ensure_image(str(fname))
             for a in annotations:
@@ -563,7 +666,7 @@ class AnnotationAssetService:
                         "iscrowd": 0,
                     },
                 )
-        else:
+        elif ft == "dataset":
             for a in annotations:
                 if a["annotation_kind"] != "image_bbox":
                     continue
@@ -585,9 +688,82 @@ class AnnotationAssetService:
                         "iscrowd": 0,
                     },
                 )
+        elif ft == "audio":
+            # COCO-style JSON: one synthetic "image" row; bbox encodes [start_s, 0, duration_s, 1].
+            base = meta.get("title") or meta.get("id", "audio")
+            iid = ensure_image(str(base))
+            for a in annotations:
+                if a["annotation_kind"] != "audio_segment":
+                    continue
+                p = a["payload"]
+                start = float(p.get("start", 0))
+                end = float(p.get("end", start))
+                dur = max(end - start, 1e-9)
+                cid = ensure_cat(str(p.get("label", "segment")))
+                aid = counters["ann"]
+                counters["ann"] += 1
+                anns_out.append(
+                    {
+                        "id": aid,
+                        "image_id": iid,
+                        "category_id": cid,
+                        "bbox": [start, 0.0, dur, 1.0],
+                        "area": float(dur),
+                        "iscrowd": 0,
+                    },
+                )
+        elif ft == "video":
+            title = str(meta.get("title") or meta.get("id", "video"))
+            for a in annotations:
+                if a["annotation_kind"] == "video_frame_bbox":
+                    p = a["payload"]
+                    frame = int(p.get("frame", 0))
+                    iid = ensure_image(f"{title}_frame_{frame}")
+                    bbox = p.get("bbox") or {}
+                    x, y, w, h = bbox.get("x", 0), bbox.get("y", 0), bbox.get("w", 0), bbox.get("h", 0)
+                    cid = ensure_cat(str(p.get("label", "object")))
+                    aid = counters["ann"]
+                    counters["ann"] += 1
+                    anns_out.append(
+                        {
+                            "id": aid,
+                            "image_id": iid,
+                            "category_id": cid,
+                            "bbox": [x, y, w, h],
+                            "area": float(w) * float(h),
+                            "iscrowd": 0,
+                        },
+                    )
+                elif a["annotation_kind"] == "video_track":
+                    p = a["payload"]
+                    label = str(p.get("label", "object"))
+                    w_box = float(p.get("w") or 1)
+                    h_box = float(p.get("h") or 1)
+                    for pt in p.get("frames") or []:
+                        frame = int(pt.get("frame", 0))
+                        iid = ensure_image(f"{title}_frame_{frame}")
+                        x = float(pt.get("x", 0))
+                        y = float(pt.get("y", 0))
+                        cid = ensure_cat(label)
+                        aid = counters["ann"]
+                        counters["ann"] += 1
+                        anns_out.append(
+                            {
+                                "id": aid,
+                                "image_id": iid,
+                                "category_id": cid,
+                                "bbox": [x, y, w_box, h_box],
+                                "area": float(w_box * h_box),
+                                "iscrowd": 0,
+                            },
+                        )
+
+        desc = "Annotra export"
+        if ft == "audio":
+            desc += " (audio: bbox = [start_s, 0, duration_s, 1])"
 
         return {
-            "info": {"description": "Annotra export", "version": "1.0"},
+            "info": {"description": desc, "version": "1.0"},
             "images": images,
             "annotations": anns_out,
             "categories": cat_list,

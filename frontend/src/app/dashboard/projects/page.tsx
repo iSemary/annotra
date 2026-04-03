@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   getProjects,
   createProject,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/projects"
 import { DEFAULT_PAGE_SIZE } from "@/lib/api"
 import { Button } from "@/components/ui/button"
+import { TableActionButton } from "@/components/ui/table-action-button"
 import {
   Card,
   CardContent,
@@ -45,10 +47,27 @@ import {
 import { useConfirm } from "@/components/ui/confirm-dialog"
 import { useAuth } from "@/context/auth-context"
 import { toast } from "sonner"
-import { Plus, Pencil, Trash2, ExternalLink, FolderOpen, Loader2 } from "lucide-react"
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  FolderOpen,
+  Loader2,
+  Image,
+  Video,
+  AudioWaveform,
+  Layers,
+  ClipboardList,
+} from "lucide-react"
 import { Pagination } from "@/components/ui/pagination"
 
+function annotationsHubHref(projectId: string) {
+  return `/dashboard/annotations?project=${encodeURIComponent(projectId)}`
+}
+
 export default function ProjectsPage() {
+  const router = useRouter()
   const { confirm } = useConfirm()
   const { user } = useAuth()
   const canManageProjects = user?.permissions?.includes("projects:manage") ?? false
@@ -174,6 +193,42 @@ export default function ProjectsPage() {
     }
   }
 
+  function ProjectFilesCell({
+    stats,
+  }: {
+    stats: NonNullable<Project["stats"]> | undefined
+  }) {
+    if (!stats || stats.files_total === 0) {
+      return <span className="text-muted-foreground tabular-nums">0</span>
+    }
+    const parts: {
+      key: string
+      Icon: typeof Image
+      n: number
+    }[] = [
+      { key: "image", Icon: Image, n: stats.files_by_type.image },
+      { key: "video", Icon: Video, n: stats.files_by_type.video },
+      { key: "audio", Icon: AudioWaveform, n: stats.files_by_type.audio },
+      { key: "dataset", Icon: Layers, n: stats.files_by_type.dataset },
+    ].filter((x) => x.n > 0)
+    return (
+      <div className="flex flex-col gap-1 text-sm">
+        <span className="font-medium tabular-nums">{stats.files_total} total</span>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {parts.map(({ key, Icon, n }) => (
+            <span
+              key={key}
+              className="inline-flex items-center gap-1 tabular-nums"
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+              {n}
+            </span>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "outline"> = {
       active: "default",
@@ -257,72 +312,110 @@ export default function ProjectsPage() {
               )}
             </div>
           ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[160px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {projects.map((project) => (
-                    <TableRow key={project.id}>
-                      <TableCell className="font-medium">{project.name}</TableCell>
-                      <TableCell className="max-w-[300px] truncate text-muted-foreground">
-                        {project.description || "—"}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(project.status)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link
-                              href={`/dashboard/projects/${project.id}`}
-                              title="Open project"
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="min-w-[140px]">Files</TableHead>
+                  <TableHead className="w-[1%] whitespace-nowrap text-right">
+                    Annotations
+                  </TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right w-[1%] whitespace-nowrap">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {projects.map((project) => (
+                  <TableRow
+                    key={project.id}
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      const t = e.target as HTMLElement
+                      if (
+                        t.closest(
+                          "a[href], button, [data-row-actions], [role='menuitem']",
+                        )
+                      ) {
+                        return
+                      }
+                      router.push(annotationsHubHref(project.id))
+                    }}
+                  >
+                    <TableCell className="font-medium">{project.name}</TableCell>
+                    <TableCell className="max-w-[300px] truncate text-muted-foreground">
+                      {project.description || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <ProjectFilesCell stats={project.stats} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Link
+                        href={annotationsHubHref(project.id)}
+                        className="inline-flex font-medium tabular-nums text-primary underline-offset-4 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {project.stats?.annotations_total ?? 0}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(project.status)}</TableCell>
+                    <TableCell className="text-right">
+                      <div
+                        className="flex justify-end gap-1"
+                        data-row-actions
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <TableActionButton
+                          label="Annotations (all types)"
+                          asChild
+                        >
+                          <Link href={annotationsHubHref(project.id)}>
+                            <ClipboardList className="h-4 w-4" />
+                          </Link>
+                        </TableActionButton>
+                        <TableActionButton label="Open project" asChild>
+                          <Link href={`/dashboard/projects/${project.id}`}>
+                            <ExternalLink className="h-4 w-4" />
+                          </Link>
+                        </TableActionButton>
+                        {canManageProjects && (
+                          <>
+                            <TableActionButton
+                              label="Edit project"
+                              onClick={() => openEditDialog(project)}
                             >
-                              <ExternalLink className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          {canManageProjects && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openEditDialog(project)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDelete(project.id)}
-                                disabled={deletingId === project.id}
-                              >
-                                {deletingId === project.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                )}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {pagination.last_page > 1 && (
-                <Pagination
-                  currentPage={pagination.current_page}
-                  totalPages={pagination.last_page}
-                  onPageChange={setCurrentPage}
-                />
-              )}
-            </>
+                              <Pencil className="h-4 w-4" />
+                            </TableActionButton>
+                            <TableActionButton
+                              label="Delete project"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(project.id)}
+                              disabled={deletingId === project.id}
+                            >
+                              {deletingId === project.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </TableActionButton>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
+          <Pagination
+            currentPage={pagination.current_page}
+            totalPages={pagination.last_page}
+            onPageChange={setCurrentPage}
+            totalItems={pagination.total}
+            pageSize={pagination.per_page}
+          />
         </CardContent>
       </Card>
 

@@ -63,6 +63,9 @@ dmypy.json
 # pyenv (local version pin; optional — remove this line if you commit it)
 .python-version
 
+# Local media uploads (MEDIA_LOCAL_PATH; default data/storage under backend/)
+data/
+
 # Secrets and local env (keep `.env.example` tracked)
 .env
 .env.local

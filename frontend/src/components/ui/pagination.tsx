@@ -10,6 +10,9 @@ export interface PaginationProps {
   totalPages: number
   onPageChange: (page: number) => void
   className?: string
+  /** Enables “Showing X–Y of Z” (including single-page and empty lists). */
+  totalItems?: number
+  pageSize?: number
 }
 
 export function Pagination({
@@ -17,6 +20,8 @@ export function Pagination({
   totalPages,
   onPageChange,
   className,
+  totalItems,
+  pageSize,
 }: PaginationProps) {
   const getPageNumbers = () => {
     const pages: (number | string)[] = []
@@ -53,54 +58,83 @@ export function Pagination({
     return pages
   }
 
-  if (totalPages <= 1) {
+  const summary =
+    totalItems !== undefined && pageSize !== undefined
+      ? totalItems === 0 || totalPages === 0
+        ? "No records"
+        : `Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(
+            currentPage * pageSize,
+            totalItems,
+          )} of ${totalItems}`
+      : null
+
+  const showPageButtons = totalPages > 1
+
+  if (!summary && !showPageButtons) {
     return null
   }
 
   return (
-    <div className={cn("flex items-center justify-center gap-2", className)}>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-      >
-        <ChevronLeft className="h-4 w-4" />
-        <span className="sr-only">Previous page</span>
-      </Button>
-
-      {getPageNumbers().map((page, index) => {
-        if (page === "ellipsis") {
-          return (
-            <Button key={`ellipsis-${index}`} variant="ghost" size="sm" disabled>
-              <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">More pages</span>
-            </Button>
-          )
-        }
-
-        const pageNum = page as number
-        return (
+    <div
+      className={cn(
+        "flex flex-col items-center gap-3 border-t border-border pt-4 mt-4",
+        className,
+      )}
+    >
+      {summary && (
+        <p className="text-xs text-muted-foreground tabular-nums">{summary}</p>
+      )}
+      {showPageButtons && (
+        <div className="flex items-center justify-center gap-2">
           <Button
-            key={pageNum}
-            variant={currentPage === pageNum ? "default" : "outline"}
+            variant="outline"
             size="sm"
-            onClick={() => onPageChange(pageNum)}
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
           >
-            {pageNum}
+            <ChevronLeft className="h-4 w-4" />
+            <span className="sr-only">Previous page</span>
           </Button>
-        )
-      })}
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-      >
-        <ChevronRight className="h-4 w-4" />
-        <span className="sr-only">Next page</span>
-      </Button>
+          {getPageNumbers().map((page, index) => {
+            if (page === "ellipsis") {
+              return (
+                <Button
+                  key={`ellipsis-${index}`}
+                  variant="ghost"
+                  size="sm"
+                  disabled
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">More pages</span>
+                </Button>
+              )
+            }
+
+            const pageNum = page as number
+            return (
+              <Button
+                key={pageNum}
+                variant={currentPage === pageNum ? "default" : "outline"}
+                size="sm"
+                onClick={() => onPageChange(pageNum)}
+              >
+                {pageNum}
+              </Button>
+            )
+          })}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            <ChevronRight className="h-4 w-4" />
+            <span className="sr-only">Next page</span>
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

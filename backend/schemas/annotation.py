@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-ASSET_STATUSES = frozenset({"draft", "in_progress", "completed", "reviewed"})
+ASSET_STATUSES = frozenset({"draft", "in_progress", "completed", "reviewed", "failed"})
 FILE_TYPES = frozenset({"image", "video", "audio", "dataset"})
 
 
@@ -162,12 +162,20 @@ class AnnotationPatchRequest(BaseModel):
 class AnnotationAssetCreateRequest(BaseModel):
     project_id: UUID
     file_type: Literal["image", "video", "audio", "dataset"]
-    title: str = Field(..., min_length=1, max_length=512)
+    title: str | None = Field(default=None, max_length=512)
     status: str = Field(default="draft")
     primary_media_id: UUID | None = None
     dataset_media_ids: list[UUID] | None = None
     frame_count: int | None = Field(default=None, ge=0)
     duration_seconds: float | None = Field(default=None, ge=0)
+
+    @field_validator("title")
+    @classmethod
+    def title_strip_empty(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        s = v.strip()
+        return s if s else None
 
     @field_validator("status")
     @classmethod

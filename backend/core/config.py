@@ -85,6 +85,10 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str | None = None
     AWS_S3_ENDPOINT: str | None = None
 
+    # Annotation asset post-create pipeline: inline (await in request), background
+    # (after response via FastAPI BackgroundTasks), external (no in-process run — wire Celery/RQ/etc.).
+    ANNOTATION_ASSET_PIPELINE_MODE: str = "inline"
+
     @field_validator("JWT_SECRET")
     @classmethod
     def jwt_secret_min_length(cls, v: str) -> str:

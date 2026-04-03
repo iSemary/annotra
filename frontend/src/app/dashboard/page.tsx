@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import {
@@ -24,6 +25,24 @@ import {
   Image as ImageIcon,
   Activity,
 } from "lucide-react"
+
+const AnnotationsByTypePieChart = dynamic(
+  () =>
+    import("@/components/dashboard/AnnotationsByTypePieChart").then(
+      (m) => m.AnnotationsByTypePieChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="flex min-h-[228px] items-center justify-center"
+        aria-hidden
+      >
+        <div className="h-36 w-36 animate-pulse rounded-full bg-muted" />
+      </div>
+    ),
+  },
+)
 
 const MODALITIES: {
   key: keyof WorkspaceStats["annotations_by_asset_type"]
@@ -243,7 +262,7 @@ export default function DashboardPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Dashboard
+              Statistics
           </h1>
           <p className="text-muted-foreground">Loading…</p>
         </div>
@@ -264,7 +283,7 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Dashboard
+            Statistics
           </h1>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -380,18 +399,17 @@ export default function DashboardPage() {
             />
             <Card className="border-border/80 shadow-sm lg:col-span-2">
               <CardHeader>
-                <CardTitle className="text-lg">Next steps</CardTitle>
+                <CardTitle className="text-lg">
+                  Annotations by file type
+                </CardTitle>
                 <CardDescription>
-                  Build datasets and keep annotation counts growing
+                  Annotation rows per modality (image, video, audio, dataset)
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
-                <p>
-                  Create a <Link href="/dashboard/projects" className="font-medium text-primary underline-offset-4 hover:underline">project</Link>
-                  , upload media, then open{" "}
-                  <Link href="/dashboard/annotations" className="font-medium text-primary underline-offset-4 hover:underline">Annotations</Link>{" "}
-                  to add image, video, audio, or dataset assets and label them in the editors.
-                </p>
+              <CardContent>
+                <AnnotationsByTypePieChart
+                  annotationsByAssetType={stats.annotations_by_asset_type}
+                />
               </CardContent>
             </Card>
           </section>

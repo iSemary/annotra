@@ -2,6 +2,17 @@ import api, { DEFAULT_PAGE_SIZE, readResponsePagination } from "./api"
 
 export type ProjectStatus = "active" | "archived"
 
+export interface ProjectStats {
+  files_by_type: {
+    image: number
+    video: number
+    audio: number
+    dataset: number
+  }
+  files_total: number
+  annotations_total: number
+}
+
 export interface Project {
   id: string
   name: string
@@ -9,6 +20,7 @@ export interface Project {
   status: ProjectStatus
   created_at: string
   updated_at: string
+  stats?: ProjectStats
 }
 
 export interface StoreProjectRequest {
