@@ -58,6 +58,7 @@ import {
   Video,
   AudioWaveform,
   Layers,
+  Box,
   ClipboardList,
 } from "lucide-react"
 import { Pagination } from "@/components/ui/pagination"
@@ -210,6 +211,7 @@ export default function ProjectsPage() {
       { key: "video", Icon: Video, n: stats.files_by_type.video },
       { key: "audio", Icon: AudioWaveform, n: stats.files_by_type.audio },
       { key: "dataset", Icon: Layers, n: stats.files_by_type.dataset },
+      { key: "model_3d", Icon: Box, n: stats.files_by_type.model_3d ?? 0 },
     ].filter((x) => x.n > 0)
     return (
       <div className="flex flex-col gap-1 text-sm">

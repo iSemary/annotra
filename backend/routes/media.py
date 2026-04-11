@@ -89,6 +89,17 @@ async def upload_media_bulk(
     )
 
 
+@router.get("/storage-tree")
+async def list_media_storage_tree(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    ctx: Annotated[RequestContext, Depends(require_permission("media:read"))],
+):
+    """On-disk layout under MEDIA_LOCAL_PATH (full tree for superuser, else `{user_id}/` only)."""
+    svc = MediaService(session)
+    items = await svc.list_local_storage_tree(ctx)
+    return success_json(message="OK", data={"items": items})
+
+
 @router.get("/{media_id}")
 async def get_media(
     media_id: UUID,

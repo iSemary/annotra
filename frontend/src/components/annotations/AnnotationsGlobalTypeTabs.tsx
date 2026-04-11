@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import {
   AudioWaveform,
+  Box,
   Image,
   Layers,
   LayoutGrid,
@@ -46,6 +47,11 @@ const TABS: TabItem[] = [
     href: "/dashboard/annotations/datasets",
     label: "Datasets",
     Icon: Layers,
+  },
+  {
+    href: "/dashboard/annotations/model-3d",
+    label: "3D models",
+    Icon: Box,
   },
 ]
 

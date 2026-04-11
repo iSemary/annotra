@@ -75,6 +75,7 @@ class DashboardService:
             "video": 0,
             "audio": 0,
             "dataset": 0,
+            "model_3d": 0,
         }
         for ft, cnt in asset_type_rows:
             if ft in assets_by_type:
@@ -109,6 +110,7 @@ class DashboardService:
             "video": 0,
             "audio": 0,
             "dataset": 0,
+            "model_3d": 0,
         }
         for ft, cnt in ann_by_type_rows:
             if ft in annotations_by_asset_type:

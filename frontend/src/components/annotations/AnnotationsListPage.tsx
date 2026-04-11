@@ -19,6 +19,7 @@ import {
 import { flushSync } from "react-dom"
 import {
   AudioWaveform,
+  Box,
   Boxes,
   ChevronDown,
   ChevronRight,
@@ -56,8 +57,11 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/api"
 import {
   MEDIA_ACCEPT_AUDIO,
   MEDIA_ACCEPT_IMAGE,
+  MEDIA_ACCEPT_MODEL_3D,
   MEDIA_ACCEPT_VIDEO,
   isAllowedMediaFile,
+  mediaExtensionsLabelForSingleFileKind,
+  mediaImageExtensionsLabel,
 } from "@/lib/media-accept"
 import { uploadFile } from "@/lib/media"
 import { useAuth } from "@/context/auth-context"
@@ -106,6 +110,14 @@ const JsonView = dynamic(() => import("@uiw/react-json-view"), {
   ssr: false,
 })
 
+const Model3dAnnotationEditor = dynamic(
+  () =>
+    import("@/components/annotations/editors/Model3dAnnotationEditor").then(
+      (m) => m.Model3dAnnotationEditor,
+    ),
+  { ssr: false },
+)
+
 export type FileTypeFilter = "all" | AnnotationFileType
 
 const STATUS_OPTS = [
@@ -128,6 +140,7 @@ const FILE_TYPE_OPTS: { value: AnnotationFileType; label: string }[] = [
   { value: "video", label: "Video" },
   { value: "audio", label: "Audio" },
   { value: "dataset", label: "Dataset" },
+  { value: "model_3d", label: "3D model" },
 ]
 
 const FILE_TYPE_ICON: Record<AnnotationFileType, LucideIcon> = {
@@ -135,6 +148,11 @@ const FILE_TYPE_ICON: Record<AnnotationFileType, LucideIcon> = {
   video: Video,
   audio: AudioWaveform,
   dataset: Layers,
+  model_3d: Box,
+}
+
+function humanAnnotationFileTypeLabel(ft: AnnotationFileType): string {
+  return FILE_TYPE_OPTS.find((o) => o.value === ft)?.label ?? ft
 }
 
 const COCO_EXPORT_FILE_TYPES: AnnotationFileType[] = [
@@ -142,6 +160,7 @@ const COCO_EXPORT_FILE_TYPES: AnnotationFileType[] = [
   "video",
   "audio",
   "dataset",
+  "model_3d",
 ]
 
 const MODEL_RERUN_FILE_TYPES: AnnotationFileType[] = [
@@ -149,6 +168,7 @@ const MODEL_RERUN_FILE_TYPES: AnnotationFileType[] = [
   "video",
   "audio",
   "dataset",
+  "model_3d",
 ]
 
 type CreateImageRow = {
@@ -504,7 +524,12 @@ export function AnnotationsListPage({
   }, [createTypeLocked])
 
   useEffect(() => {
-    if (createTypeLocked === "video" || createTypeLocked === "audio") return
+    if (
+      createTypeLocked === "video" ||
+      createTypeLocked === "audio" ||
+      createTypeLocked === "model_3d"
+    )
+      return
     setCreatePrimaryId(null)
   }, [createTypeLocked])
 
@@ -526,12 +551,19 @@ export function AnnotationsListPage({
       toast.error("You need media:write to upload files")
       return
     }
-    const kind = createTypeLocked === "video" ? "video" : "audio"
+    const kind =
+      createTypeLocked === "video"
+        ? "video"
+        : createTypeLocked === "model_3d"
+          ? "model_3d"
+          : "audio"
     if (!isAllowedMediaFile(f, kind)) {
       toast.error(
         kind === "video"
           ? "Choose a video file the server allows (e.g. mp4, mov, webm, m4v, 3gp)"
-          : "Choose an audio file the server allows (e.g. mp3, wav, flac, m4a, aac, …)",
+          : kind === "model_3d"
+            ? "Choose a 3D file the server allows (e.g. glb, gltf, obj, stl, …)"
+            : "Choose an audio file the server allows (e.g. mp3, wav, flac, m4a, aac, …)",
       )
       e.target.value = ""
       return
@@ -788,7 +820,7 @@ export function AnnotationsListPage({
         <h1 className="text-2xl font-bold tracking-tight">
           {fileTypeFilter === "all"
             ? "Annotations"
-            : `${fileTypeFilter.charAt(0).toUpperCase()}${fileTypeFilter.slice(1)} annotations`}
+            : `${humanAnnotationFileTypeLabel(fileTypeFilter)} annotations`}
         </h1>
       </div>
 
@@ -865,7 +897,12 @@ export function AnnotationsListPage({
               </div>
               {createTypeLocked === "dataset" ? (
                 <div className="min-w-0 space-y-2 md:col-span-3">
-                  <Label>Dataset images (min 2)</Label>
+                  <Label className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span>Dataset images (min 2)</span>
+                    <span className="font-normal text-xs text-muted-foreground">
+                      Allowed: {mediaImageExtensionsLabel()}
+                    </span>
+                  </Label>
                   <Input
                     type="file"
                     accept={MEDIA_ACCEPT_IMAGE}
@@ -879,7 +916,15 @@ export function AnnotationsListPage({
                 </div>
               ) : createTypeLocked === "image" ? (
                 <div className="min-w-0 space-y-2 md:col-span-3">
-                  <Label htmlFor="ann-images">Images</Label>
+                  <Label
+                    htmlFor="ann-images"
+                    className="flex flex-wrap items-baseline gap-x-2 gap-y-1"
+                  >
+                    <span>Images</span>
+                    <span className="font-normal text-xs text-muted-foreground">
+                      Allowed: {mediaImageExtensionsLabel()}
+                    </span>
+                  </Label>
                   <Input
                     id="ann-images"
                     type="file"
@@ -931,13 +976,27 @@ export function AnnotationsListPage({
                 </div>
               ) : (
                 <div className="min-w-0 space-y-2 md:col-span-3">
-                  <Label>Media file</Label>
+                  <Label className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span>Media file</span>
+                    <span className="font-normal text-xs text-muted-foreground">
+                      Allowed:{" "}
+                      {mediaExtensionsLabelForSingleFileKind(
+                        createTypeLocked === "video"
+                          ? "video"
+                          : createTypeLocked === "model_3d"
+                            ? "model_3d"
+                            : "audio",
+                      )}
+                    </span>
+                  </Label>
                   <Input
                     type="file"
                     accept={
                       createTypeLocked === "video"
                         ? MEDIA_ACCEPT_VIDEO
-                        : MEDIA_ACCEPT_AUDIO
+                        : createTypeLocked === "model_3d"
+                          ? MEDIA_ACCEPT_MODEL_3D
+                          : MEDIA_ACCEPT_AUDIO
                     }
                     disabled={!canWriteMedia || uploading}
                     onChange={onUploadSingle}
@@ -1308,6 +1367,15 @@ export function AnnotationsListPage({
                 controls
                 className="w-full"
               />
+            )}
+          {previewAsset?.primary_media_url &&
+            previewAsset.file_type === "model_3d" && (
+              <div className="h-[min(70vh,480px)] min-h-[240px] w-full overflow-hidden rounded-md border">
+                <Model3dAnnotationEditor
+                  asset={previewAsset}
+                  readOnly
+                />
+              </div>
             )}
           {previewAsset?.file_type === "dataset" &&
             !previewAsset.primary_media_url && (

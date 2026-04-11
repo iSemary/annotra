@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Annotra API",
-    "description": "SaaS-based multimodal annotation platform designed for managing and labeling complex datasets including images, videos, and audio.",
+    "description": "SaaS-based multimodal annotation platform for images, video, audio, datasets, and 3D models (glTF/GLB and other stored formats). Upload model media first, then create a model_3d annotation asset with primary_media_id.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -1086,6 +1086,110 @@
               { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
             ],
             "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/export?format=csv"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Annotation assets (3D model)",
+      "item": [
+        {
+          "name": "Create model_3d asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_asset_id', j.data.id);",
+                  "  if (pm.environment) pm.environment.set('annotation_asset_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{project_id}}\",\n  \"file_type\": \"model_3d\",\n  \"title\": \"Postman 3D asset\",\n  \"primary_media_id\": \"{{media_id}}\"\n}"
+            },
+            "description": "Requires media uploaded with kind model_3d (e.g. .glb). Set {{media_id}} from the media upload response.",
+            "url": "{{base_url}}/api/v1/annotation-assets"
+          }
+        },
+        {
+          "name": "Create model_3d_point annotation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"annotation_kind\": \"model_3d_point\",\n  \"payload\": {\n    \"label\": \"anchor\",\n    \"position\": { \"x\": 0.1, \"y\": 0.2, \"z\": 0.05 }\n  }\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/annotations"
+          }
+        },
+        {
+          "name": "Create model_3d_oriented_box annotation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.id) {",
+                  "  pm.collectionVariables.set('annotation_id', j.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"annotation_kind\": \"model_3d_oriented_box\",\n  \"payload\": {\n    \"label\": \"part\",\n    \"center\": { \"x\": 0, \"y\": 0.5, \"z\": 0 },\n    \"half_extents\": { \"x\": 0.3, \"y\": 0.2, \"z\": 0.4 },\n    \"rotation\": { \"x\": 0, \"y\": 0, \"z\": 0, \"w\": 1 }\n  }\n}"
+            },
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/annotations"
+          }
+        },
+        {
+          "name": "Export 3D asset (JSON)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/export?format=json"
           }
         }
       ]

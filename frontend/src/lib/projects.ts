@@ -8,6 +8,7 @@ export interface ProjectStats {
     video: number
     audio: number
     dataset: number
+    model_3d: number
   }
   files_total: number
   annotations_total: number

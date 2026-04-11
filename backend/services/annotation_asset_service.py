@@ -43,6 +43,7 @@ _DEFAULT_TITLE_LABEL = {
     "video": "Video",
     "audio": "Audio",
     "dataset": "Dataset",
+    "model_3d": "3D model",
 }
 
 
@@ -67,6 +68,9 @@ def _validate_annotation_kind_for_asset(file_type: str, kind: str) -> None:
     elif file_type == "audio":
         if kind != "audio_segment":
             raise AppException(400, "Only audio_segment annotations allowed for audio assets")
+    elif file_type == "model_3d":
+        if kind not in ("model_3d_point", "model_3d_oriented_box"):
+            raise AppException(400, "Invalid annotation kind for 3D model asset")
 
 
 class AnnotationAssetService:
@@ -255,6 +259,9 @@ class AnnotationAssetService:
         elif asset.file_type == "audio":
             dataset_size_value = asset.duration_seconds
             dataset_size_unit = "seconds"
+        elif asset.file_type == "model_3d":
+            dataset_size_value = 1
+            dataset_size_unit = "models"
         else:
             dataset_size_value = dataset_n
             dataset_size_unit = "images"
@@ -361,11 +368,13 @@ class AnnotationAssetService:
             if body.dataset_media_ids:
                 raise AppException(400, "dataset_media_ids only allowed for dataset assets")
             m = await self._media.find_by_id(body.primary_media_id, ctx.user_id)
-            expected = {
+            expected_by_type = {
                 "image": MediaKind.IMAGE.value,
                 "video": MediaKind.VIDEO.value,
                 "audio": MediaKind.AUDIO.value,
-            }[body.file_type]
+                "model_3d": MediaKind.MODEL_3D.value,
+            }
+            expected = expected_by_type[body.file_type]
             if m.kind != expected:
                 raise AppException(400, f"Media kind {m.kind} does not match file_type {body.file_type}")
             asset.primary_media_id = body.primary_media_id
@@ -602,7 +611,13 @@ class AnnotationAssetService:
             raw = buf.getvalue().encode("utf-8")
             return "text/csv", f"asset-{asset_id}.csv", raw
         if fmt == "coco":
-            if asset.file_type not in ("image", "dataset", "audio", "video"):
+            if asset.file_type not in (
+                "image",
+                "dataset",
+                "audio",
+                "video",
+                "model_3d",
+            ):
                 raise AppException(
                     400,
                     "COCO export is not supported for this asset type",
@@ -758,9 +773,70 @@ class AnnotationAssetService:
                             },
                         )
 
+        elif ft == "model_3d":
+            # Lossy COCO projection: one synthetic "image"; points as 1×1 boxes in XY;
+            # oriented boxes as axis-aligned XY bounds (full pose → JSON export).
+            base = str(meta.get("title") or meta.get("id", "model_3d"))
+            iid = ensure_image(base)
+            for a in annotations:
+                kind = a["annotation_kind"]
+                p = a["payload"]
+                if kind == "model_3d_point":
+                    pos = p.get("position") or {}
+                    x = float(pos.get("x", 0))
+                    y = float(pos.get("y", 0))
+                    z = float(pos.get("z", 0))
+                    cid = ensure_cat(str(p.get("label", "point")))
+                    aid = counters["ann"]
+                    counters["ann"] += 1
+                    anns_out.append(
+                        {
+                            "id": aid,
+                            "image_id": iid,
+                            "category_id": cid,
+                            "bbox": [x, y, 1.0, 1.0],
+                            "area": 1.0,
+                            "iscrowd": 0,
+                            "annotra_3d": {"z": z},
+                        },
+                    )
+                elif kind == "model_3d_oriented_box":
+                    ctr = p.get("center") or {}
+                    he = p.get("half_extents") or {}
+                    cx = float(ctr.get("x", 0))
+                    cy = float(ctr.get("y", 0))
+                    cz = float(ctr.get("z", 0))
+                    hx = max(float(he.get("x", 0)), 1e-9)
+                    hy = max(float(he.get("y", 0)), 1e-9)
+                    hz = max(float(he.get("z", 0)), 1e-9)
+                    cid = ensure_cat(str(p.get("label", "box")))
+                    aid = counters["ann"]
+                    counters["ann"] += 1
+                    w_box = 2.0 * hx
+                    h_box = 2.0 * hy
+                    anns_out.append(
+                        {
+                            "id": aid,
+                            "image_id": iid,
+                            "category_id": cid,
+                            "bbox": [cx - hx, cy - hy, w_box, h_box],
+                            "area": float(w_box * h_box),
+                            "iscrowd": 0,
+                            "annotra_3d": {
+                                "center_z": cz,
+                                "half_extent_z": hz,
+                                "rotation": p.get("rotation"),
+                            },
+                        },
+                    )
+
         desc = "Annotra export"
         if ft == "audio":
             desc += " (audio: bbox = [start_s, 0, duration_s, 1])"
+        elif ft == "model_3d":
+            desc += (
+                " (3D: COCO bbox is XY-only; z and quaternion use annotra_3d / JSON export)"
+            )
 
         return {
             "info": {"description": desc, "version": "1.0"},

@@ -4,7 +4,12 @@ import api, {
   readResponsePagination,
 } from "./api"
 
-export type AnnotationFileType = "image" | "video" | "audio" | "dataset"
+export type AnnotationFileType =
+  | "image"
+  | "video"
+  | "audio"
+  | "dataset"
+  | "model_3d"
 export type AnnotationAssetStatus =
   | "draft"
   | "in_progress"
@@ -210,6 +215,7 @@ export function annotationReadPermission(ft: AnnotationFileType): string {
     video: "annotations:video:read",
     audio: "annotations:audio:read",
     dataset: "annotations:dataset:read",
+    model_3d: "annotations:model_3d:read",
   }
   return m[ft]
 }
@@ -220,6 +226,7 @@ export function annotationWritePermission(ft: AnnotationFileType): string {
     video: "annotations:video:write",
     audio: "annotations:audio:write",
     dataset: "annotations:dataset:write",
+    model_3d: "annotations:model_3d:write",
   }
   return m[ft]
 }
@@ -250,6 +257,15 @@ function guessExtensionFromContentType(ct: string | null): string {
     "audio/ogg": ".ogg",
     "audio/mp4": ".m4a",
     "audio/aac": ".aac",
+    "model/gltf+json": ".gltf",
+    "model/gltf-binary": ".glb",
+    "model/obj": ".obj",
+    "model/stl": ".stl",
+    "model/ply": ".ply",
+    "model/vnd.usdz+zip": ".usdz",
+    "model/x3d+xml": ".x3d",
+    "model/vrml": ".wrl",
+    "application/x-blender": ".blend",
   }
   return map[c] ?? ".bin"
 }

@@ -8,6 +8,7 @@ import {
   Video,
   AudioLines,
   Database,
+  Box,
 } from 'lucide-react';
 import type { AuthUser } from '@/lib/api';
 import {
@@ -86,6 +87,17 @@ export function DashboardAnnotationsSidebar({ user }: { user: AuthUser | null })
         />,
       );
     }
+    if (canReadAnnotationModality(user, 'model_3d')) {
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-3d"
+          href={`${base}/model-3d`}
+          icon={Box}
+          label="3D models"
+          active={projectAnnotationNavActive(pathname, projectId, 'model_3d')}
+        />,
+      );
+    }
   } else {
     if (canReadAnyAnnotationModality(user)) {
       rows.push(
@@ -142,6 +154,18 @@ export function DashboardAnnotationsSidebar({ user }: { user: AuthUser | null })
           href={href}
           icon={Database}
           label="Datasets"
+          active={pathname === href}
+        />,
+      );
+    }
+    if (canReadAnnotationModality(user, 'model_3d')) {
+      const href = `${hub}/model-3d`;
+      rows.push(
+        <SidebarAnnotationChildLink
+          key="ann-3d"
+          href={href}
+          icon={Box}
+          label="3D models"
           active={pathname === href}
         />,
       );

@@ -1,5 +1,9 @@
+import asyncio
+import mimetypes
+import os
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -8,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import Settings, get_settings
 from core.exceptions import AppException
+from core.rbac import RequestContext
 from models.media import Media
 from models.media_kind import (
     AUDIO_FILE_EXTENSIONS,
@@ -374,3 +379,95 @@ class MediaService:
             items.append(media_to_dict(m, url))
 
         return items, pagination_meta(page=page, page_size=per_page, total=total)
+
+    _STORAGE_TREE_IN_CHUNK = 500
+
+    @staticmethod
+    def _walk_local_storage_root(root: Path) -> list[tuple[str, bool, int | None, float]]:
+        """Relative posix path, is_dir, size or None, mtime."""
+        out: list[tuple[str, bool, int | None, float]] = []
+        if not root.is_dir():
+            return out
+        root = root.resolve()
+        for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+            dpath = Path(dirpath)
+            rel_dir = dpath.relative_to(root)
+            rel_posix = rel_dir.as_posix() if rel_dir.parts else ""
+            for name in sorted(dirnames):
+                sub = f"{rel_posix}/{name}".lstrip("/") if rel_posix else name
+                full = root / sub
+                try:
+                    st = full.stat()
+                    out.append((sub, True, None, float(st.st_mtime)))
+                except OSError:
+                    continue
+            for name in sorted(filenames):
+                sub = f"{rel_posix}/{name}".lstrip("/") if rel_posix else name
+                full = root / sub
+                try:
+                    st = full.stat()
+                    out.append((sub, False, int(st.st_size), float(st.st_mtime)))
+                except OSError:
+                    continue
+        return out
+
+    async def list_local_storage_tree(self, ctx: RequestContext) -> list[dict[str, Any]]:
+        """Walk on-disk MEDIA_LOCAL_PATH (full tree for superuser, else only this user's prefix)."""
+        if (self._settings.MEDIA_STORAGE or "").lower() == "aws":
+            raise AppException(
+                400,
+                "Storage folder view is only available when MEDIA_STORAGE is local disk.",
+            )
+        base = self._settings.media_local_path_resolved.resolve()
+        if ctx.is_superuser:
+            root = base
+            key_prefix: str | None = None
+        else:
+            root = (base / str(ctx.user_id)).resolve()
+            try:
+                root.relative_to(base)
+            except ValueError:
+                raise AppException(500, "Invalid media storage configuration") from None
+            key_prefix = str(ctx.user_id)
+
+        rows = await asyncio.to_thread(self._walk_local_storage_root, root)
+        file_keys: list[str] = []
+        for path, is_dir, _sz, _mt in rows:
+            if is_dir:
+                continue
+            sk = path if key_prefix is None else f"{key_prefix}/{path}"
+            file_keys.append(sk)
+
+        media_by_key: dict[str, Media] = {}
+        for i in range(0, len(file_keys), self._STORAGE_TREE_IN_CHUNK):
+            chunk = file_keys[i : i + self._STORAGE_TREE_IN_CHUNK]
+            if not chunk:
+                break
+            result = await self._session.execute(
+                select(Media).where(Media.storage_key.in_(chunk)),
+            )
+            for m in result.scalars().all():
+                media_by_key[m.storage_key] = m
+
+        items: list[dict[str, Any]] = []
+        for path, is_dir, size, mtime in rows:
+            item: dict[str, Any] = {
+                "path": path,
+                "is_dir": is_dir,
+                "size_bytes": None if is_dir else size,
+                "modified_at": datetime.fromtimestamp(mtime, UTC).isoformat(),
+            }
+            if not is_dir:
+                sk = path if key_prefix is None else f"{key_prefix}/{path}"
+                row = media_by_key.get(sk)
+                if row is not None:
+                    url = await self.get_url_for_key(row.storage_key)
+                    item["media"] = media_to_dict(row, url)
+                else:
+                    mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
+                    url = await self.get_url_for_key(sk)
+                    item["media"] = None
+                    item["mime_type"] = mime
+                    item["url"] = url
+            items.append(item)
+        return items

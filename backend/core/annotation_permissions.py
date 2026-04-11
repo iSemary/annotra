@@ -5,7 +5,7 @@ from __future__ import annotations
 from core.exceptions import AppException
 from core.rbac import RequestContext
 
-FILE_TYPES = frozenset({"image", "video", "audio", "dataset"})
+FILE_TYPES = frozenset({"image", "video", "audio", "dataset", "model_3d"})
 
 # Coarse RBAC from initial seed; still granted to several roles.
 LEGACY_ANNOTATIONS_READ = "annotations:read"
@@ -16,6 +16,7 @@ READ_PERM = {
     "video": "annotations:video:read",
     "audio": "annotations:audio:read",
     "dataset": "annotations:dataset:read",
+    "model_3d": "annotations:model_3d:read",
 }
 
 WRITE_PERM = {
@@ -23,6 +24,7 @@ WRITE_PERM = {
     "video": "annotations:video:write",
     "audio": "annotations:audio:write",
     "dataset": "annotations:dataset:write",
+    "model_3d": "annotations:model_3d:write",
 }
 
 

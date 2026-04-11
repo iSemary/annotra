@@ -171,6 +171,7 @@ export function AudioAnnotationEditor({ asset }: { asset: AnnotationAsset }) {
     })
 
     regions.on("region-created", (region) => {
+      if (!String(region.id).startsWith("region-")) return
       const start = region.start
       const end = region.end
       region.remove()

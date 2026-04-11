@@ -5,7 +5,13 @@ import {
   type AnnotationFileType,
 } from "@/lib/annotation-assets"
 
-const MODALITIES: AnnotationFileType[] = ["image", "video", "audio", "dataset"]
+const MODALITIES: AnnotationFileType[] = [
+  "image",
+  "video",
+  "audio",
+  "dataset",
+  "model_3d",
+]
 
 const PROJECT_ID_IN_PATH =
   /^\/dashboard\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
@@ -15,6 +21,7 @@ const MODALITY_SEGMENT: Record<AnnotationFileType, string> = {
   video: "videos",
   audio: "audios",
   dataset: "datasets",
+  model_3d: "model-3d",
 }
 
 /** Non-null when the current path is under `/dashboard/projects/{id}/...`. */
@@ -39,7 +46,10 @@ export function projectAnnotationNavActive(
     if (!pathname.startsWith(prefix)) return false
     const rest = pathname.slice(prefix.length)
     const first = rest.split("/")[0] ?? ""
-    if (["images", "videos", "audios", "datasets"].includes(first)) return false
+    if (
+      ["images", "videos", "audios", "datasets", "model-3d"].includes(first)
+    )
+      return false
     return true
   }
   const sub = MODALITY_SEGMENT[segment]

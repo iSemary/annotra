@@ -18,6 +18,7 @@ const SLICES = [
   { key: "video", label: "Video", chartVar: "--chart-2" },
   { key: "audio", label: "Audio", chartVar: "--chart-3" },
   { key: "dataset", label: "Dataset", chartVar: "--chart-4" },
+  { key: "model_3d", label: "3D models", chartVar: "--chart-5" },
 ] as const
 
 function readCssVar(name: string, fallback: string): string {

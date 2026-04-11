@@ -62,6 +62,8 @@ async def create_annotation_asset(
 ):
     svc = AnnotationAssetService(session)
     asset = await svc.create_asset(ctx, body)
+    # Persist before the pipeline runs in a separate session (inline mode must see this row).
+    await session.commit()
     await schedule_annotation_asset_pipeline(asset.id, background_tasks=background_tasks)
     data = await svc.get_asset(ctx, asset.id)
     return success_json(

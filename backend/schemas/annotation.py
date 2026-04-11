@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 ASSET_STATUSES = frozenset({"draft", "in_progress", "completed", "reviewed", "failed"})
-FILE_TYPES = frozenset({"image", "video", "audio", "dataset"})
+FILE_TYPES = frozenset({"image", "video", "audio", "dataset", "model_3d"})
 
 
 class BBox(BaseModel):
@@ -85,6 +85,74 @@ class VideoTrackPayload(BaseModel):
         return out
 
 
+class Vec3(BaseModel):
+    x: float
+    y: float
+    z: float
+
+
+class Quaternion(BaseModel):
+    x: float
+    y: float
+    z: float
+    w: float
+
+    @model_validator(mode="after")
+    def nearly_unit(self) -> Quaternion:
+        n = (self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w) ** 0.5
+        if n < 1e-9 or abs(n - 1.0) > 1e-2:
+            raise ValueError("rotation quaternion must be approximately unit length")
+        return self
+
+    def to_storage_dict(self) -> dict[str, float]:
+        return {"x": self.x, "y": self.y, "z": self.z, "w": self.w}
+
+
+class Model3dPointPayload(BaseModel):
+    id: str | None = None
+    label: str = Field(..., min_length=1, max_length=512)
+    position: Vec3
+
+    def to_storage_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "label": self.label,
+            "position": self.position.model_dump(),
+        }
+        if self.id:
+            d["id"] = self.id
+        return d
+
+
+class Model3dOrientedBoxPayload(BaseModel):
+    id: str | None = None
+    label: str = Field(..., min_length=1, max_length=512)
+    center: Vec3
+    half_extents: Vec3
+    rotation: Quaternion
+
+    @model_validator(mode="after")
+    def positive_half_extents(self) -> Model3dOrientedBoxPayload:
+        for name, v in (
+            ("half_extents.x", self.half_extents.x),
+            ("half_extents.y", self.half_extents.y),
+            ("half_extents.z", self.half_extents.z),
+        ):
+            if v <= 0:
+                raise ValueError(f"{name} must be positive")
+        return self
+
+    def to_storage_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "label": self.label,
+            "center": self.center.model_dump(),
+            "half_extents": self.half_extents.model_dump(),
+            "rotation": self.rotation.to_storage_dict(),
+        }
+        if self.id:
+            d["id"] = self.id
+        return d
+
+
 class AudioSegmentPayload(BaseModel):
     id: str | None = None
     start: float = Field(..., ge=0)
@@ -114,6 +182,8 @@ class AnnotationCreateRequest(BaseModel):
         "video_frame_bbox",
         "video_track",
         "audio_segment",
+        "model_3d_point",
+        "model_3d_oriented_box",
     ]
     payload: dict[str, Any]
 
@@ -127,6 +197,10 @@ class AnnotationCreateRequest(BaseModel):
             return VideoTrackPayload.model_validate(self.payload).to_storage_dict()
         if kind == "audio_segment":
             return AudioSegmentPayload.model_validate(self.payload).to_storage_dict()
+        if kind == "model_3d_point":
+            return Model3dPointPayload.model_validate(self.payload).to_storage_dict()
+        if kind == "model_3d_oriented_box":
+            return Model3dOrientedBoxPayload.model_validate(self.payload).to_storage_dict()
         raise ValueError(f"Unknown kind {kind}")
 
 
@@ -136,6 +210,8 @@ class AnnotationPatchRequest(BaseModel):
         "video_frame_bbox",
         "video_track",
         "audio_segment",
+        "model_3d_point",
+        "model_3d_oriented_box",
     ] | None = None
     payload: dict[str, Any] | None = None
 
@@ -156,12 +232,16 @@ class AnnotationPatchRequest(BaseModel):
             return kind, VideoTrackPayload.model_validate(base).to_storage_dict()
         if kind == "audio_segment":
             return kind, AudioSegmentPayload.model_validate(base).to_storage_dict()
+        if kind == "model_3d_point":
+            return kind, Model3dPointPayload.model_validate(base).to_storage_dict()
+        if kind == "model_3d_oriented_box":
+            return kind, Model3dOrientedBoxPayload.model_validate(base).to_storage_dict()
         raise ValueError(f"Unknown kind {kind}")
 
 
 class AnnotationAssetCreateRequest(BaseModel):
     project_id: UUID
-    file_type: Literal["image", "video", "audio", "dataset"]
+    file_type: Literal["image", "video", "audio", "dataset", "model_3d"]
     title: str | None = Field(default=None, max_length=512)
     status: str = Field(default="draft")
     primary_media_id: UUID | None = None

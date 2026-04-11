@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import IntegrityError
 from starlette.staticfiles import StaticFiles
 
 from core.config import get_settings
@@ -81,6 +82,32 @@ def create_app() -> FastAPI:
             message="Validation error",
             status_code=422,
             errors=errors,
+        )
+
+    @application.exception_handler(IntegrityError)
+    async def integrity_error_handler(request, exc: IntegrityError):
+        logger.warning(
+            "integrity error path=%s: %s",
+            request.url.path,
+            exc.orig,
+        )
+        detail = str(exc.orig) if exc.orig else str(exc)
+        low = detail.lower()
+        if "ck_annotation_assets_file_type" in low or (
+            "annotation_assets" in low
+            and ("file_type" in low or "check constraint" in low)
+        ):
+            return error_json(
+                message=(
+                    "This database schema does not allow this asset type (often "
+                    "`model_3d`). Apply migrations: from the backend directory run "
+                    "`alembic upgrade head`, then retry."
+                ),
+                status_code=400,
+            )
+        return error_json(
+            message="Database constraint violated",
+            status_code=400,
         )
 
     @application.exception_handler(Exception)

@@ -95,10 +95,14 @@ _MEDIA_TYPE_ROWS: list[tuple[str, str, MediaKind]] = [
 MIME_TO_EXTENSION: dict[str, str] = {r[0]: r[1] for r in _MEDIA_TYPE_ROWS}
 MIME_TO_KIND: dict[str, MediaKind] = {r[0]: r[2] for r in _MEDIA_TYPE_ROWS}
 
+# Browsers often send wrong Content-Types for models (e.g. Chrome uses
+# application/x-tgif for some .obj uploads). Treat like octet-stream: require a
+# known filename extension.
 GENERIC_MIMES_FOR_EXTENSION_MATCH: frozenset[str] = frozenset(
     {
         "application/octet-stream",
         "text/plain",
         "application/zip",
+        "application/x-tgif",
     }
 )

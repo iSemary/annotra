@@ -53,6 +53,7 @@ const MODALITIES: {
   { key: "video", label: "Video", chartVar: "--chart-2" },
   { key: "audio", label: "Audio", chartVar: "--chart-3" },
   { key: "dataset", label: "Dataset", chartVar: "--chart-4" },
+  { key: "model_3d", label: "3D models", chartVar: "--chart-5" },
 ]
 
 function KpiCard({
@@ -403,7 +404,7 @@ export default function DashboardPage() {
                   Annotations by file type
                 </CardTitle>
                 <CardDescription>
-                  Annotation rows per modality (image, video, audio, dataset)
+                  Annotation rows per modality (including 3D models)
                 </CardDescription>
               </CardHeader>
               <CardContent>

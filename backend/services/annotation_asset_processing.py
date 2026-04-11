@@ -27,6 +27,7 @@ async def process_annotation_asset_after_create(asset_id: UUID) -> None:
             if asset.file_type == "audio":
                 asset.status = "in_progress"
             else:
+                # image, video, dataset, model_3d: mark completed after placeholder pipeline
                 asset.status = "completed"
             asset.updated_at = datetime.now(UTC)
             await session.commit()

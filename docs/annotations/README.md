@@ -1,6 +1,6 @@
 # Annotations
 
-**Assets** live under a **project** and have a type: `image`, `video`, `audio`, or `dataset`. They link to **media** (one primary file, or multiple for datasets). **Annotations** are JSON rows (`annotation_kind`, `payload`) on an asset.
+**Assets** live under a **project** and have a type: `image`, `video`, `audio`, `dataset`, or **`model_3d`**. They link to **media** (one primary file, or multiple for datasets). **Annotations** are JSON rows (`annotation_kind`, `payload`) on an asset.
 
 **API** — Bearer, base `/api/v1`, tag `annotation-assets`:
 
@@ -15,7 +15,7 @@
 
 Routes require **`projects:read`**. Read/write per **asset type** uses `annotations:{type}:read|write`, or legacy **`annotations:read`** / **`annotations:write`** for all types. Superusers skip checks. Media uploads use [Media](../media/README.md) permissions.
 
-**App:** `/dashboard/annotations` (+ `/images`, `/videos`, `/audios`, `/datasets`) shows the **combined** asset table; per-project URLs stay under `/dashboard/projects/{id}/annotations/...`. The dashboard **sidebar** and **top bar** mirror All / Images / … using either global or project-scoped links depending on the current route.
+**App:** `/dashboard/annotations` (+ `/images`, `/videos`, `/audios`, `/datasets`, **`/model-3d`**) shows the **combined** asset table; per-project URLs stay under `/dashboard/projects/{id}/annotations/...`. The dashboard **sidebar** and **top bar** mirror All / Images / … / **3D models** using either global or project-scoped links depending on the current route.
 
 **Postman:** collection in repo includes annotation examples.
 

@@ -25,9 +25,31 @@ export interface ListMediaResult {
   pagination: PaginationMeta | null
 }
 
+/** One node from on-disk MEDIA_LOCAL_PATH (see GET /media/storage-tree). */
+export interface MediaStorageTreeNode {
+  path: string
+  is_dir: boolean
+  size_bytes: number | null
+  modified_at: string
+  media?: MediaRecord | null
+  mime_type?: string
+  url?: string
+}
+
 /**
  * Paginated list of the current user's uploads.
  */
+/**
+ * Folder/file layout on local disk (superuser: entire storage; others: their `{user_id}/` tree).
+ */
+export async function listMediaStorageTree(): Promise<MediaStorageTreeNode[]> {
+  const r = await api.get<{ items: MediaStorageTreeNode[] }>(
+    "/media/storage-tree",
+  )
+  const body = r.data as { items?: MediaStorageTreeNode[] }
+  return body.items ?? []
+}
+
 export async function listMedia(
   params: ListMediaParams = {},
 ): Promise<ListMediaResult> {

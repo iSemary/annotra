@@ -1,11 +1,25 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import type { AnnotationAsset } from "@/lib/annotation-assets"
 import { AnnotationEditorDownloads } from "@/components/annotations/AnnotationEditorDownloads"
 import { ImageAnnotationEditor } from "@/components/annotations/editors/ImageAnnotationEditor"
 import { VideoAnnotationEditor } from "@/components/annotations/editors/VideoAnnotationEditor"
 import { AudioAnnotationEditor } from "@/components/annotations/editors/AudioAnnotationEditor"
 import { DatasetAnnotationEditor } from "@/components/annotations/editors/DatasetAnnotationEditor"
+
+const Model3dAnnotationEditor = dynamic(
+  () =>
+    import("@/components/annotations/editors/Model3dAnnotationEditor").then(
+      (m) => m.Model3dAnnotationEditor,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm text-muted-foreground">Loading 3D viewer…</p>
+    ),
+  },
+)
 
 export function AnnotationAssetEditorPanel({ asset }: { asset: AnnotationAsset }) {
   const inner = (() => {
@@ -18,6 +32,8 @@ export function AnnotationAssetEditorPanel({ asset }: { asset: AnnotationAsset }
         return <AudioAnnotationEditor asset={asset} />
       case "dataset":
         return <DatasetAnnotationEditor asset={asset} />
+      case "model_3d":
+        return <Model3dAnnotationEditor asset={asset} />
       default:
         return (
           <p className="text-sm text-muted-foreground">Unsupported asset type.</p>
