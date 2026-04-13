@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from starlette.staticfiles import StaticFiles
 
 from core.config import get_settings
@@ -82,6 +82,41 @@ def create_app() -> FastAPI:
             message="Validation error",
             status_code=422,
             errors=errors,
+        )
+
+    @application.exception_handler(OperationalError)
+    async def operational_error_handler(request, exc: OperationalError):
+        logger.warning(
+            "database unavailable path=%s: %s",
+            request.url.path,
+            exc.orig,
+        )
+        return error_json(
+            message=(
+                "Database is unavailable. Start PostgreSQL and verify DATABASE_URL "
+                "(e.g. `docker compose up -d db` from the repo root when using port 15432)."
+            ),
+            status_code=503,
+        )
+
+    @application.exception_handler(ProgrammingError)
+    async def programming_error_handler(request, exc: ProgrammingError):
+        detail = str(exc.orig) if exc.orig else str(exc)
+        logger.warning("database programming error path=%s: %s", request.url.path, detail)
+        low = detail.lower()
+        if "does not exist" in low and (
+            "relation" in low or "table" in low or "column" in low
+        ):
+            return error_json(
+                message=(
+                    "Database schema is missing or out of date. From the backend directory "
+                    "run `alembic upgrade head`, then retry."
+                ),
+                status_code=503,
+            )
+        return error_json(
+            message="Database query failed",
+            status_code=400,
         )
 
     @application.exception_handler(IntegrityError)

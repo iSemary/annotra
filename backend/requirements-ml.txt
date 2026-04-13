@@ -1,0 +1,15 @@
+# Install alongside requirements.txt for the Celery ML worker (torch + models).
+# API-only installs can omit this file.
+torch>=2.2.0
+transformers>=4.48.0
+accelerate>=1.0.0
+safetensors>=0.4.0
+numpy>=1.26.0
+Pillow>=10.0.0
+opencv-python-headless>=4.9.0
+trimesh>=4.0.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
+soundfile>=0.12.0
+# Optional: local / air-gapped Whisper without loading HF Whisper weights via transformers
+faster-whisper>=1.0.0

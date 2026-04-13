@@ -1,3 +1,6 @@
+# Install inside a venv (see backend/README.md). On Debian/Ubuntu, system pip is blocked (PEP 668):
+#   cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+# Or: ./setup-venv.sh
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 sqlalchemy[asyncio]>=2.0.36
@@ -12,3 +15,6 @@ email-validator>=2.2.0
 pyotp>=2.9.0
 cryptography>=43.0.0
 boto3>=1.35.0
+celery[redis]>=5.4.0
+redis>=5.0.0
+numpy>=1.26.0

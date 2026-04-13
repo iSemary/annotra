@@ -5,6 +5,7 @@ import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
+import Stats from "three/examples/jsm/libs/stats.module.js"
 import { Loader2, MapPin, MousePointer2, Plus, Square, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -116,6 +117,7 @@ export function Model3dAnnotationEditor({
   asset: AnnotationAsset
   readOnly?: boolean
 }) {
+  const viewportRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
@@ -271,7 +273,8 @@ export function Model3dAnnotationEditor({
 
   useEffect(() => {
     const el = wrapRef.current
-    if (!el) return
+    const viewport = viewportRef.current
+    if (!el || !viewport) return
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x0f1419)
@@ -292,6 +295,13 @@ export function Model3dAnnotationEditor({
     renderer.outputColorSpace = THREE.SRGBColorSpace
     el.appendChild(renderer.domElement)
     rendererRef.current = renderer
+
+    const stats = new Stats()
+    stats.dom.style.position = "absolute"
+    stats.dom.style.top = "0"
+    stats.dom.style.left = "0"
+    stats.dom.style.zIndex = "20"
+    viewport.appendChild(stats.dom)
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
@@ -329,14 +339,17 @@ export function Model3dAnnotationEditor({
 
     const tick = () => {
       rafRef.current = requestAnimationFrame(tick)
+      stats.begin()
       controls.update()
       renderer.render(scene, camera)
+      stats.end()
     }
     tick()
 
     return () => {
       cancelAnimationFrame(rafRef.current)
       ro.disconnect()
+      stats.dom.remove()
       transform.dispose()
       controls.dispose()
       renderer.dispose()
@@ -692,7 +705,10 @@ export function Model3dAnnotationEditor({
         </div>
       )}
 
-      <div className="relative min-h-[280px] min-w-0 flex-1 rounded-md border border-border bg-muted/20">
+      <div
+        ref={viewportRef}
+        className="relative min-h-[280px] min-w-0 flex-1 rounded-md border border-border bg-muted/20"
+      >
         <div
           ref={wrapRef}
           className="h-full min-h-[280px] w-full cursor-crosshair"

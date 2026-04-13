@@ -158,13 +158,16 @@ async def delete_annotation(
 @router.post("/{asset_id}/re-annotate")
 async def re_annotate_annotation_asset(
     asset_id: UUID,
+    background_tasks: BackgroundTasks,
     session: Annotated[AsyncSession, Depends(get_async_session)],
     ctx: Annotated[RequestContext, Depends(require_permission("projects:read"))],
 ):
     svc = AnnotationAssetService(session)
     data = await svc.re_annotate_with_model(ctx, asset_id)
+    await session.commit()
+    await schedule_annotation_asset_pipeline(asset_id, background_tasks=background_tasks)
     return success_json(
-        message="Re-annotate accepted (model integration pending)",
+        message="Re-annotate accepted; model pipeline scheduled",
         data=data,
     )
 

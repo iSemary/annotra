@@ -17,13 +17,23 @@ Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and set `J
 
 ### Run locally
 
-With Postgres reachable per `DATABASE_URL` and commands run from `backend/` (after `cd backend`):
+
+```bash
+cd backend
+chmod +x setup-venv.sh   # once, if needed
+./setup-venv.sh            # creates .venv and installs requirements.txt
+source .venv/bin/activate
+alembic upgrade head
+```
+
+Or manually:
 
 ```bash
 cd backend
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+source .venv/bin/activate   # required before every pip/python in this project
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 alembic upgrade head
 ```
 

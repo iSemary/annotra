@@ -45,12 +45,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    DATABASE_URL: str = "postgresql+asyncpg://annotra:annotra@localhost:5432/annotra"
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://annotra:annotra@localhost:15432/annotra"
+    )
     JWT_SECRET: str = "dev-secret-change-in-production-min-32-chars!!"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    CORS_ORIGINS: str = "http://localhost:3000"
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
     ENVIRONMENT: str = "development"
     COOKIE_SECURE: bool = False
 
@@ -88,6 +90,25 @@ class Settings(BaseSettings):
     # Annotation asset post-create pipeline: inline (await in request), background
     # (after response via FastAPI BackgroundTasks), external (no in-process run — wire Celery/RQ/etc.).
     ANNOTATION_ASSET_PIPELINE_MODE: str = "inline"
+
+    # Celery / Redis (used when ANNOTATION_ASSET_PIPELINE_MODE is external|queue|worker).
+    REDIS_URL: str = "redis://127.0.0.1:6379/0"
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND: str = ""
+
+    # ML pipeline: no Hugging Face Hub HTTP when ML_OFFLINE=true (local cache dirs only).
+    HF_TOKEN: str | None = None
+    ML_OFFLINE: bool = False
+    ML_PIPELINE_DRY_RUN: bool = False
+    # Audio: "transformers" (Whisper via HF-format weights) or "faster_whisper" (CTranslate2; no Hub if path is local).
+    WHISPER_ENGINE: str = "transformers"
+    SAM2_MODEL_ID: str = "facebook/sam2-hiera-large"
+    SAM2_POINT_GRID_STRIDE: int = 64
+    SAM2_MAX_MASKS: int = 32
+    WHISPER_MODEL_ID: str = "openai/whisper-large-v3"
+    VIDEO_MAX_FRAMES: int = 120
+    MASK3D_POINT_SAMPLE_COUNT: int = 65536
+    MASK3D_MIN_CLUSTER_POINTS: int = 80
 
     @field_validator("JWT_SECRET")
     @classmethod
@@ -141,6 +162,16 @@ class Settings(BaseSettings):
         if self.APP_URL and self.APP_URL.strip():
             return f"{self.APP_URL.rstrip('/')}/storage"
         return f"http://127.0.0.1:{self.API_PORT}/storage"
+
+    @property
+    def celery_broker_url_resolved(self) -> str:
+        b = (self.CELERY_BROKER_URL or "").strip()
+        return b if b else self.REDIS_URL.strip()
+
+    @property
+    def celery_result_backend_resolved(self) -> str:
+        r = (self.CELERY_RESULT_BACKEND or "").strip()
+        return r if r else self.celery_broker_url_resolved
 
 
 @lru_cache

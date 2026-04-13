@@ -19,6 +19,15 @@ class LocalMediaStorage:
         if full_path.is_file():
             full_path.unlink()
 
+    def _read_bytes_sync(self, key: str) -> bytes:
+        full_path = self._base_path / key
+        if not full_path.is_file():
+            raise FileNotFoundError(key)
+        return full_path.read_bytes()
+
+    async def read_bytes(self, key: str) -> bytes:
+        return await asyncio.to_thread(self._read_bytes_sync, key)
+
     async def upload(self, body: bytes, key: str, _mime_type: str) -> None:
         await asyncio.to_thread(self._upload_sync, body, key)
 

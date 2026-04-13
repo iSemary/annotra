@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import case, cast, exists, func, or_, select
+from sqlalchemy import case, cast, delete, exists, func, or_, select
 from sqlalchemy.types import Text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -579,10 +579,29 @@ class AnnotationAssetService:
         await self._sync_asset_status_for_annotation_count(asset_id)
 
     async def re_annotate_with_model(self, ctx: RequestContext, asset_id: UUID) -> dict[str, Any]:
-        """Placeholder for Hugging Face (or other) model-based re-annotation."""
+        """Delete all annotations and reset asset to in_progress; caller commits and schedules pipeline."""
+        import logging
+
+        log_ml = logging.getLogger("annotra.annotation_asset")
         asset = await self._load_asset(ctx, asset_id, with_members=True)
         ensure_can_write_file_type(ctx, asset.file_type)
-        # TODO: call HF inference API, map outputs to annotations, persist rows
+        n_deleted = await self._annotation_count(asset_id)
+        if n_deleted:
+            await self._session.execute(
+                delete(AnnotationRow).where(AnnotationRow.asset_id == asset_id),
+            )
+        log_ml.info(
+            "re_annotate_start",
+            extra={
+                "asset_id": str(asset_id),
+                "action": "re_annotate",
+                "annotations_deleted": n_deleted,
+            },
+        )
+        asset.status = "in_progress"
+        asset.updated_at = datetime.now(UTC)
+        await self._session.flush()
+        await self._session.refresh(asset, ["dataset_members"])
         cnt = await self._annotation_count(asset_id)
         return await self._asset_to_dict(asset, cnt, with_members=True)
 

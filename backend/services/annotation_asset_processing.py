@@ -1,4 +1,4 @@
-"""Post-create pipeline for annotation assets (in-process or external queue)."""
+"""Post-create pipeline for annotation assets (in-process or Celery queue)."""
 
 from __future__ import annotations
 
@@ -11,37 +11,65 @@ from fastapi import BackgroundTasks
 from core.config import get_settings
 from db.session import async_session_maker
 from models.annotation_asset import AnnotationAsset
+from services.media_storage.factory import create_media_storage
+from services.ml_inference.runtime_env import apply_ml_runtime_environment
 
 log = logging.getLogger("annotra.annotation_asset")
 
 
-async def process_annotation_asset_after_create(asset_id: UUID) -> None:
-    """Run ingest / validation; moves asset from in_progress → completed or failed."""
+async def _mark_failed(asset_id: UUID) -> None:
     try:
         async with async_session_maker() as session:
             asset = await session.get(AnnotationAsset, asset_id)
+            if asset is not None and asset.status == "in_progress":
+                asset.status = "failed"
+                asset.updated_at = datetime.now(UTC)
+                await session.commit()
+    except Exception:
+        log.exception("could not mark annotation asset failed id=%s", asset_id)
+
+
+def _enqueue_celery(asset_id: UUID) -> None:
+    from worker.celery_app import app as celery_app
+
+    celery_app.send_task(
+        "annotra.run_annotation_asset_pipeline",
+        args=[str(asset_id)],
+    )
+    log.info(
+        "annotation_pipeline_enqueued",
+        extra={"asset_id": str(asset_id), "task": "annotra.run_annotation_asset_pipeline"},
+    )
+
+
+async def process_annotation_asset_after_create(asset_id: UUID) -> None:
+    """Run ML inference; moves asset from in_progress → completed or failed."""
+    settings = get_settings()
+    apply_ml_runtime_environment(settings)
+
+    try:
+        async with async_session_maker() as session:
+            from services.ml_inference.orchestrator import load_asset_for_pipeline, run_ml_for_asset
+
+            asset = await load_asset_for_pipeline(session, asset_id)
             if asset is None or asset.status != "in_progress":
+                log.info(
+                    "pipeline_skip",
+                    extra={"asset_id": str(asset_id), "reason": "missing_or_not_in_progress"},
+                )
                 return
-            # Placeholder for real work (transcode, virus scan, thumbnails, …).
-            # Audio: keep in_progress until segments exist (manual or HF pipeline later).
-            if asset.file_type == "audio":
-                asset.status = "in_progress"
-            else:
-                # image, video, dataset, model_3d: mark completed after placeholder pipeline
-                asset.status = "completed"
-            asset.updated_at = datetime.now(UTC)
+
+            log.info(
+                "pipeline_start",
+                extra={"asset_id": str(asset_id), "file_type": asset.file_type},
+            )
+            storage = create_media_storage(settings)
+            await run_ml_for_asset(session, asset, storage, settings)
             await session.commit()
+            log.info("pipeline_complete", extra={"asset_id": str(asset_id)})
     except Exception:
         log.exception("annotation asset pipeline failed id=%s", asset_id)
-        try:
-            async with async_session_maker() as session:
-                asset = await session.get(AnnotationAsset, asset_id)
-                if asset is not None and asset.status == "in_progress":
-                    asset.status = "failed"
-                    asset.updated_at = datetime.now(UTC)
-                    await session.commit()
-        except Exception:
-            log.exception("could not mark annotation asset failed id=%s", asset_id)
+        await _mark_failed(asset_id)
 
 
 async def schedule_annotation_asset_pipeline(
@@ -54,7 +82,7 @@ async def schedule_annotation_asset_pipeline(
 
     - inline / immediate: await in the current request (default).
     - background / deferred: FastAPI BackgroundTasks after the response is sent.
-    - external / queue / worker: no in-process run — publish to your queue from here later.
+    - external / queue / worker: Celery task (requires Redis broker).
     """
     mode = (get_settings().ANNOTATION_ASSET_PIPELINE_MODE or "inline").strip().lower()
     if mode in ("inline", "immediate"):
@@ -62,13 +90,14 @@ async def schedule_annotation_asset_pipeline(
     elif mode in ("background", "deferred", "async"):
         background_tasks.add_task(process_annotation_asset_after_create, asset_id)
     elif mode in ("external", "queue", "worker"):
-        log.warning(
-            "ANNOTATION_ASSET_PIPELINE_MODE=%s: external queue not integrated; "
-            "asset %s left in_progress. Publish jobs from "
-            "schedule_annotation_asset_pipeline() or a worker.",
-            mode,
-            asset_id,
-        )
+        try:
+            _enqueue_celery(asset_id)
+        except Exception:
+            log.exception(
+                "annotation_pipeline_enqueue_failed",
+                extra={"asset_id": str(asset_id)},
+            )
+            await _mark_failed(asset_id)
     else:
         log.warning(
             "Unknown ANNOTATION_ASSET_PIPELINE_MODE=%r; using inline processing",

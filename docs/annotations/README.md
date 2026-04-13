@@ -7,8 +7,14 @@
 - `GET /annotation-assets` — list (pagination, optional filters/sort). Query `project_id` limits to one project; **omit** `project_id` to list assets across all projects in the company (same RBAC per `file_type`).
 - `POST /annotation-assets` — create asset (new rows start **`in_progress`**, then a post-create pipeline sets **`completed`** or **`failed`**).
 
-**Pipeline (`ANNOTATION_ASSET_PIPELINE_MODE` in [`backend/.env.example`](../../backend/.env.example))** — `inline` / `immediate`: run processing in the same request (response reflects final status). `background` / `deferred` / `async`: run after the response via FastAPI **BackgroundTasks** (UI may poll while `in_progress`). `external` / `queue` / `worker`: no in-process run; implement publishing in `backend/services/annotation_asset_processing.py` (asset stays `in_progress` until your worker finishes). Unknown values fall back to inline with a log warning.
+**Pipeline (`ANNOTATION_ASSET_PIPELINE_MODE` in [`backend/.env.example`](../../backend/.env.example))** — `inline` / `immediate`: run ML inference in the same request (response reflects final `completed` / `failed`). `background` / `deferred` / `async`: run after the response via FastAPI **BackgroundTasks** (UI may poll while `in_progress`). `external` / `queue` / `worker`: enqueue a **Celery** task (`annotra.run_annotation_asset_pipeline`); requires **Redis** (`REDIS_URL` / `CELERY_BROKER_URL`) and a worker process: from `backend/`, `celery -A worker.celery_app worker -l info`. Install worker ML libraries with `pip install -r requirements.txt -r requirements-ml.txt`. Use `ML_PIPELINE_DRY_RUN=true` for placeholder annotations without loading large models.
+
+**Air-gapped / no Hub HTTP** — set `ML_OFFLINE=true`. The process sets `HF_HUB_OFFLINE`, `TRANSFORMERS_OFFLINE`, and loads SAM2/Whisper with `local_files_only` (Transformers) so weights must exist on disk (snapshot directories pointed to by `SAM2_MODEL_ID` / `WHISPER_MODEL_ID`, or a pre-populated Hugging Face cache). `HF_TOKEN` is not used when `ML_OFFLINE=true`. For audio without Transformers Whisper weights, set `WHISPER_ENGINE=faster_whisper` and `WHISPER_MODEL_ID` to a local **CTranslate2** model directory (`pip install faster-whisper`).
+
+**Models (worker)** — images / dataset images / video: **SAM 2** via Transformers (`SAM2_MODEL_ID`). Audio: Transformers Whisper (`WHISPER_ENGINE=transformers`) or **faster-whisper** (`WHISPER_ENGINE=faster_whisper`). 3D meshes: **geometric instance clustering** (surface sample + DBSCAN + PCA oriented boxes), not the full ScanNet Mask3D training stack.
+
 - `GET|PATCH|DELETE /annotation-assets/{id}` — one asset.
+- `POST /annotation-assets/{id}/re-annotate` — deletes **all** annotations, sets `in_progress`, and schedules the same ML pipeline again (same modes as create). **Destructive** to manual labels.
 - `GET|POST /annotation-assets/{id}/annotations` — list / create annotations.
 - `PATCH|DELETE /annotation-assets/{id}/annotations/{annotation_id}` — update / delete.
 - `GET /annotation-assets/{id}/export?format=json|csv|coco` — download.

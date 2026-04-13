@@ -36,6 +36,10 @@ class S3MediaStorage:
     def _delete_sync(self, key: str) -> None:
         self._client.delete_object(Bucket=self._bucket, Key=key)
 
+    def _get_object_bytes_sync(self, key: str) -> bytes:
+        obj = self._client.get_object(Bucket=self._bucket, Key=key)
+        return obj["Body"].read()
+
     def _presigned_get_sync(self, key: str) -> str:
         return self._client.generate_presigned_url(
             "get_object",
@@ -48,6 +52,9 @@ class S3MediaStorage:
 
     async def delete(self, key: str) -> None:
         await asyncio.to_thread(self._delete_sync, key)
+
+    async def read_bytes(self, key: str) -> bytes:
+        return await asyncio.to_thread(self._get_object_bytes_sync, key)
 
     async def get_url(self, key: str) -> str:
         if self._public_base_url:

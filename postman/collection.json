@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Annotra API",
-    "description": "SaaS-based multimodal annotation platform for images, video, audio, datasets, and 3D models (glTF/GLB and other stored formats). Upload model media first, then create a model_3d annotation asset with primary_media_id.",
+    "description": "SaaS-based multimodal annotation platform for images, video, audio, datasets, and 3D models (glTF/GLB and other stored formats). Upload model media first, then create a model_3d annotation asset with primary_media_id.\n\nAnnotation assets start in_progress; ML pipeline (SAM2, Whisper, 3D geometric clustering) fills annotations per ANNOTATION_ASSET_PIPELINE_MODE. Poll GET /annotation-assets while in_progress. POST /annotation-assets/{id}/re-annotate deletes all annotations and re-runs the pipeline (destructive).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -806,6 +806,17 @@
               { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
             ],
             "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}"
+          }
+        },
+        {
+          "name": "Re-annotate asset (ML pipeline)",
+          "description": "Deletes all annotations on this asset, sets in_progress, and schedules the same post-create ML pipeline as create. Poll GET annotation-assets/{{annotation_asset_id}} until status is completed or failed.",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+            ],
+            "url": "{{base_url}}/api/v1/annotation-assets/{{annotation_asset_id}}/re-annotate"
           }
         },
         {
