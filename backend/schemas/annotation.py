@@ -42,13 +42,32 @@ class VideoFrameBboxPayload(BaseModel):
     frame: int = Field(..., ge=0)
     label: str = Field(..., min_length=1, max_length=512)
     bbox: BBox
+    """Inclusive playback window in seconds (optional). When set, UI/export may use time; `frame` stays the reference index (e.g. range start)."""
+    from_sec: float | None = Field(default=None, ge=0)
+    to_sec: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def normalize_time_window(self) -> VideoFrameBboxPayload:
+        if self.from_sec is None:
+            if self.to_sec is not None:
+                raise ValueError("from_sec is required when to_sec is set")
+            return self
+        fs = float(self.from_sec)
+        ts = float(self.to_sec) if self.to_sec is not None else fs
+        if fs > ts:
+            fs, ts = ts, fs
+        return self.model_copy(update={"from_sec": fs, "to_sec": ts})
 
     def to_storage_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "frame": self.frame,
             "label": self.label,
             "bbox": self.bbox.model_dump(),
         }
+        if self.from_sec is not None:
+            d["from_sec"] = self.from_sec
+            d["to_sec"] = self.to_sec
+        return d
 
 
 class TrackFramePoint(BaseModel):

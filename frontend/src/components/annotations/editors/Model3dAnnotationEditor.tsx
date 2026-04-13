@@ -277,6 +277,9 @@ export function Model3dAnnotationEditor({
     })
   }, [rows, selectedId])
 
+  const rebuildAnnotationMeshesRef = useRef(rebuildAnnotationMeshes)
+  rebuildAnnotationMeshesRef.current = rebuildAnnotationMeshes
+
   useEffect(() => {
     rebuildAnnotationMeshes()
   }, [rebuildAnnotationMeshes])
@@ -427,7 +430,7 @@ export function Model3dAnnotationEditor({
         const cam = cameraRef.current
         const ctl = controlsRef.current
         if (cam && ctl) fitCameraToObject(cam, ctl, group)
-        rebuildAnnotationMeshes()
+        rebuildAnnotationMeshesRef.current()
       } catch (e) {
         if (!cancelled)
           setModelError(e instanceof Error ? e.message : "Failed to load GLB/glTF")
@@ -439,7 +442,7 @@ export function Model3dAnnotationEditor({
     return () => {
       cancelled = true
     }
-  }, [canViewGltf, url, rebuildAnnotationMeshes])
+  }, [canViewGltf, url])
 
   useEffect(() => {
     const c = controlsRef.current
@@ -730,10 +733,10 @@ export function Model3dAnnotationEditor({
           ref={statsMountRef}
           className="flex shrink-0 flex-wrap items-center gap-1"
         />
-        <div className="relative min-h-[280px] min-w-0 flex-1 rounded-md border border-border bg-muted/20">
+        <div className="relative min-h-[min(65vh,720px)] min-w-0 flex-1 rounded-md border border-border bg-muted/20">
           <div
             ref={wrapRef}
-            className="h-full min-h-[280px] w-full cursor-crosshair"
+            className="h-full min-h-[min(65vh,720px)] w-full cursor-crosshair"
           />
           {(loadingModel || loadingList) && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/40">

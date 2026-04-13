@@ -1356,7 +1356,6 @@ export function AnnotationsListPage({
             previewAsset.file_type === "video" && (
               <video
                 src={previewAsset.primary_media_url}
-                controls
                 className="w-full max-h-[70vh] rounded-md border"
               />
             )}
@@ -1370,7 +1369,7 @@ export function AnnotationsListPage({
             )}
           {previewAsset?.primary_media_url &&
             previewAsset.file_type === "model_3d" && (
-              <div className="h-[min(70vh,480px)] min-h-[240px] w-full overflow-hidden rounded-md border">
+              <div className="h-[min(75vh,640px)] min-h-[320px] w-full overflow-hidden rounded-md border">
                 <Model3dAnnotationEditor
                   asset={previewAsset}
                   readOnly
@@ -1423,7 +1422,7 @@ export function AnnotationsListPage({
               </p>
             )}
           </SheetHeader>
-          <SheetBody className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+          <SheetBody className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-contain p-4">
             {editSheetLoading && (
               <div className="flex flex-1 justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

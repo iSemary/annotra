@@ -42,9 +42,9 @@ export function AnnotationAssetEditorPanel({ asset }: { asset: AnnotationAsset }
   })()
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex min-h-0 w-full min-w-0 max-w-full flex-col gap-3">
       <AnnotationEditorDownloads asset={asset} />
-      <div className="min-h-0 flex-1 flex flex-col overflow-hidden">{inner}</div>
+      <div className="min-h-0 w-full min-w-0 flex flex-1 flex-col">{inner}</div>
     </div>
   )
 }

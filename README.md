@@ -33,10 +33,10 @@ SaaS-based multimodal annotation platform designed for managing and labeling com
 
 ## Figma Snapshots
 
-For a visual preview of the project, check out my Figma designs:
+For a visual preview of the project, check out Figma design:
 [Open With Figma](https://www.figma.com/design/w9ZObRsg3MFSxlHRt2Oc1g/Annotra)
 
-<img alt="snapshot" src="https://i.ibb.co/0ryX35C/Screenshot-from-2024-08-01-13-26-40.png" />
+<img alt="snapshot" src="https://i.ibb.co/Hfrsj3X4/image.png" />
 
 
 ## Get Started

@@ -41,7 +41,8 @@ describe("manual annotation create — video", () => {
       .getByRole("heading", { name: /Frame bounding box/i })
       .parentElement as HTMLElement
     const frameInputs = within(framePanel).getAllByRole("textbox")
-    const [, labelInput, xInput, yInput] = frameInputs
+    // Frame, Label, From (s), To (s), x, y, w, h
+    const [, labelInput, , , xInput, yInput] = frameInputs
     await user.clear(labelInput)
     await user.type(labelInput, "person")
     await user.clear(xInput)
