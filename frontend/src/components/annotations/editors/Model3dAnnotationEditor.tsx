@@ -91,6 +91,20 @@ function collectMeshes(root: THREE.Object3D): THREE.Mesh[] {
   return out
 }
 
+/** Show FPS / MS / MB panels side-by-side (Stats.js normally toggles one per click). */
+function layoutStatsPanelsInRow(statsDom: HTMLElement) {
+  statsDom.style.display = "flex"
+  statsDom.style.flexDirection = "row"
+  statsDom.style.flexWrap = "wrap"
+  statsDom.style.gap = "6px"
+  statsDom.style.alignItems = "flex-start"
+  statsDom.style.cursor = "default"
+  for (let i = 0; i < statsDom.children.length; i++) {
+    const c = statsDom.children[i] as HTMLElement
+    c.style.display = "block"
+  }
+}
+
 function fitCameraToObject(
   camera: THREE.PerspectiveCamera,
   controls: OrbitControls,
@@ -117,7 +131,7 @@ export function Model3dAnnotationEditor({
   asset: AnnotationAsset
   readOnly?: boolean
 }) {
-  const viewportRef = useRef<HTMLDivElement>(null)
+  const statsMountRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
@@ -273,8 +287,8 @@ export function Model3dAnnotationEditor({
 
   useEffect(() => {
     const el = wrapRef.current
-    const viewport = viewportRef.current
-    if (!el || !viewport) return
+    const statsHost = statsMountRef.current
+    if (!el || !statsHost) return
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x0f1419)
@@ -297,11 +311,17 @@ export function Model3dAnnotationEditor({
     rendererRef.current = renderer
 
     const stats = new Stats()
-    stats.dom.style.position = "absolute"
+    stats.dom.style.position = "relative"
     stats.dom.style.top = "0"
     stats.dom.style.left = "0"
-    stats.dom.style.zIndex = "20"
-    viewport.appendChild(stats.dom)
+    stats.dom.style.zIndex = ""
+    layoutStatsPanelsInRow(stats.dom)
+    const blockStatsClickCycle = (ev: Event) => {
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+    }
+    stats.dom.addEventListener("click", blockStatsClickCycle, true)
+    statsHost.appendChild(stats.dom)
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
@@ -705,30 +725,33 @@ export function Model3dAnnotationEditor({
         </div>
       )}
 
-      <div
-        ref={viewportRef}
-        className="relative min-h-[280px] min-w-0 flex-1 rounded-md border border-border bg-muted/20"
-      >
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5">
         <div
-          ref={wrapRef}
-          className="h-full min-h-[280px] w-full cursor-crosshair"
+          ref={statsMountRef}
+          className="flex shrink-0 flex-wrap items-center gap-1"
         />
-        {(loadingModel || loadingList) && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/40">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        )}
-        {!canViewGltf && url && (
-          <p className="absolute bottom-2 left-2 right-2 rounded bg-background/90 p-2 text-xs text-muted-foreground">
-            In-browser viewing supports GLB and glTF only. Download the original
-            file to use other formats. Annotations are still listed on the right.
-          </p>
-        )}
-        {modelError && (
-          <p className="absolute bottom-2 left-2 right-2 rounded bg-destructive/10 p-2 text-xs text-destructive">
-            {modelError}
-          </p>
-        )}
+        <div className="relative min-h-[280px] min-w-0 flex-1 rounded-md border border-border bg-muted/20">
+          <div
+            ref={wrapRef}
+            className="h-full min-h-[280px] w-full cursor-crosshair"
+          />
+          {(loadingModel || loadingList) && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/40">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!canViewGltf && url && (
+            <p className="absolute bottom-2 left-2 right-2 rounded bg-background/90 p-2 text-xs text-muted-foreground">
+              In-browser viewing supports GLB and glTF only. Download the original
+              file to use other formats. Annotations are still listed on the right.
+            </p>
+          )}
+          {modelError && (
+            <p className="absolute bottom-2 left-2 right-2 rounded bg-destructive/10 p-2 text-xs text-destructive">
+              {modelError}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex max-h-[50vh] w-full shrink-0 flex-col gap-3 overflow-auto border-t border-border pt-2 md:max-h-none md:w-56 md:border-l md:border-t-0 md:pl-3 md:pt-0">
